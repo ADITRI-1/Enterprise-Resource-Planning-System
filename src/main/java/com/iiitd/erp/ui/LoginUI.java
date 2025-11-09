@@ -139,7 +139,6 @@ public class LoginUI extends JFrame {
         // ================= FOOTER =================
         JPanel footer = new JPanel(new GridLayout(2, 1));
         footer.setBackground(new Color(245, 247, 250));
-
         JPanel linkPanel = new JPanel();
         linkPanel.setBackground(new Color(245, 247, 250));
         newUserLabel = new JLabel("<html><u>New User Registration</u></html>");
@@ -155,7 +154,6 @@ public class LoginUI extends JFrame {
         copyRight.setForeground(Color.GRAY);
         copyRight.setFont(new Font("Segoe UI", Font.PLAIN, 12));
         footer.add(copyRight);
-
         add(footer, BorderLayout.SOUTH);
 
         // ================= ACTION LISTENER =================

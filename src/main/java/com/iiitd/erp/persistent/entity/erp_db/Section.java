@@ -46,5 +46,4 @@ public class Section {
     @Column(name = "registration_deadline", nullable = false)
     private LocalDate registrationDeadline;
 
-    // getters/setters
 }
