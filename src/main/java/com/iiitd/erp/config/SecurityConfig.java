@@ -31,7 +31,11 @@ public class SecurityConfig {
       UsersAuth u = repo.findByUsername(username)
           .orElseThrow(() -> new UsernameNotFoundException("No such user"));
       if (!"active".equalsIgnoreCase(u.getStatus())) throw new DisabledException("User inactive/locked");
-      var auths = List.of(new SimpleGrantedAuthority("ROLE_"+u.getRole().toUpperCase()));
+      String role = u.getRole().toUpperCase();
+      if (!role.equals("ADMIN") && !role.equals("INSTRUCTOR") && !role.equals("STUDENT")) {
+        throw new UsernameNotFoundException("Wrong userRole: " + role);
+      }
+      var auths = List.of(new SimpleGrantedAuthority(u.getRole().toUpperCase()));
       return User.withUsername(u.getUsername())
           .password(u.getPasswordHash())
           .authorities(auths)
@@ -60,7 +64,14 @@ public class SecurityConfig {
         .requestMatchers("/api/instructor/**").hasRole("INSTRUCTOR")
         .requestMatchers("/api/student/**").hasRole("STUDENT")
         .anyRequest().authenticated()
-      );
+      )
+            .exceptionHandling(eh -> eh
+                    .accessDeniedHandler((request, response, accessDeniedException) -> {
+                      response.setStatus(403);
+                      response.setContentType("application/json");
+                      response.getWriter().write("{\"error\": \"Wrong userRole\"}");
+                    })
+            );
     return http.build();
   }
 
