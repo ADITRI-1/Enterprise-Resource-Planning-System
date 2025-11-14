@@ -19,7 +19,7 @@ import java.util.UUID;
 @NoArgsConstructor
 @Entity
 @Table(name = "user_auth", schema = "auth_db")
-public class UsersAuth {
+public class UserAuth {
     @Id
     @Column(name = "user_id", columnDefinition = "uuid")
     private UUID userId;

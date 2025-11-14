@@ -1,6 +1,6 @@
 package com.iiitd.erp.config;
 
-import com.iiitd.erp.persistent.entity.auth_db.UsersAuth;
+import com.iiitd.erp.persistent.entity.auth_db.UserAuth;
 import com.iiitd.erp.persistent.persistence.repository.UsersAuthRepository;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -28,7 +28,7 @@ public class SecurityConfig {
   @Bean
   UserDetailsService userDetailsService(UsersAuthRepository repo){
     return username -> {
-      UsersAuth u = repo.findByUsername(username)
+      UserAuth u = repo.findByUsername(username)
           .orElseThrow(() -> new UsernameNotFoundException("No such user"));
       if (!"active".equalsIgnoreCase(u.getStatus())) throw new DisabledException("User inactive/locked");
       String role = u.getRole().toUpperCase();

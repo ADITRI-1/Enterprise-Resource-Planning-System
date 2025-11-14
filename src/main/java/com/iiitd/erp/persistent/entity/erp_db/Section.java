@@ -25,8 +25,8 @@ public class Section {
     @Column(name = "section_id", columnDefinition = "uuid")
     private UUID sectionId;
 
-    @Column(name = "course_code", nullable = false, length = 64)
-    private String courseCode;            // FK to erp_db.course_details.id (string)
+    @Column(name = "course_id", nullable = false, length = 64)
+    private String courseId;            // FK to erp_db.course_details.id (string)
 
     @Column(name = "instructor_id", columnDefinition = "uuid")
     private UUID instructorId;            // nullable
@@ -42,6 +42,9 @@ public class Section {
 
     @Column(name = "enrollment_count", nullable = false)
     private Integer enrollmentCount;
+
+    @Column(name = "is_active")
+    private Boolean isActive;
 
     @Column(name = "registration_deadline", nullable = false)
     private LocalDate registrationDeadline;

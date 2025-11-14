@@ -23,11 +23,14 @@ public class Student {
     @Column(name = "student_id", columnDefinition = "uuid")
     private UUID studentId;  // FK to auth_db.user_auth.user_id
 
+    @Column(name = "student_name", nullable = false, length = 50)
+    private String studentName;
+
     @Column(name = "roll_no", nullable = false, unique = true, length = 50)
     private String rollNo;
 
-    @Column(name = "program", nullable = false, length = 120)
-    private String program;
+    @Column(name = "program_id", nullable = false, length = 120)
+    private String program_id;
 
     @Column(name = "year", nullable = false)
     private Integer year;

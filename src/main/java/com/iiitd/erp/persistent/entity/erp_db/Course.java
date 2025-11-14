@@ -19,15 +19,18 @@ import java.util.List;
 @AllArgsConstructor
 @NoArgsConstructor
 @Entity
-@Table(name = "course_details")
+@Table(name = "course_details", schema = "erp_db")
 public class Course {
 
     @Id
-    @Column(name="id")
+    @Column(name="course_id")
     String courseId;
 
     @Column(name="title")
     String title;
+
+    @Column(name="dept_id")
+    String deptId;
 
     @Column(name="credits")
     Integer credits;
@@ -35,5 +38,4 @@ public class Course {
     @Column(name="change_log")
     @JdbcTypeCode(SqlTypes.JSON)
     List<Changelog> changeLog;
-
 }
