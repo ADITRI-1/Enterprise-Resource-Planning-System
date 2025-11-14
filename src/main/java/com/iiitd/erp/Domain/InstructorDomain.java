@@ -11,7 +11,7 @@ public class InstructorDomain {
     private String name;
     private String instructorCode;
     private String dateOfBirth;
-    private String department;
+    private String deptId;
     private String email;
     private String phone;
 }

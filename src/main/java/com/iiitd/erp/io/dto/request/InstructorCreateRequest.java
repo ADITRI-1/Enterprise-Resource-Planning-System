@@ -11,7 +11,7 @@ public record InstructorCreateRequest(
         String name,
         String instructorCode,
         String dateOfBirth,
-        String department,
+        String deptId,
         String email,
         String phone
 ) {}

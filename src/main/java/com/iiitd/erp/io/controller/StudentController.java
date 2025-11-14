@@ -2,7 +2,7 @@ package com.iiitd.erp.io.controller;
 
 import com.iiitd.erp.core.service.AccessService;
 import com.iiitd.erp.core.service.MaintenanceService;
-import com.iiitd.erp.core.service.StudentService;
+import com.iiitd.erp.core.service.StudentRoleService;
 import com.iiitd.erp.exception.ErrorCode;
 import com.iiitd.erp.exception.ErpException;
 import com.iiitd.erp.io.dto.request.DropRequest;
@@ -13,7 +13,6 @@ import com.iiitd.erp.io.dto.response.TimetableSlot;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.core.io.FileSystemResource;
-import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -33,11 +32,11 @@ public class StudentController {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(StudentController.class);
 
-    private final StudentService students;
+    private final StudentRoleService students;
     private final AccessService access;
     private final MaintenanceService maintenance;
 
-    public StudentController(StudentService students, AccessService access, MaintenanceService maintenance){
+    public StudentController(StudentRoleService students, AccessService access, MaintenanceService maintenance){
         this.students = students;
         this.access = access;
         this.maintenance = maintenance;

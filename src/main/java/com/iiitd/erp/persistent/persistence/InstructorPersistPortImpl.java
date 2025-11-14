@@ -11,8 +11,10 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import static com.iiitd.erp.mappers.DomainToEntityMapper.DOMAIN_TO_ENTITY_MAPPER_INSTANCE;
 import static com.iiitd.erp.mappers.EntityToDomainMapper.ENTITY_TO_DOMAIN_MAPPER_INSTANCE;
@@ -91,6 +93,19 @@ public class InstructorPersistPortImpl implements InstructorPersistPort {
             LOGGER.error("Failed to delete instructor {}", instructorCode, ex);
             throw ErpException.wrap(
                     ErrorCode.INSTRUCTOR_DELETE_FAILED, ex, Map.of("instructorCode", instructorCode));
+        }
+    }
+
+    @Override
+    public List<InstructorDomain> findAll() {
+        LOGGER.debug("Fetching all instructors");
+        try {
+            return instructorRepository.findAll().stream()
+                    .map(ENTITY_TO_DOMAIN_MAPPER_INSTANCE::instructorToInstructorDomain)
+                    .collect(Collectors.toList());
+        } catch (Exception ex) {
+            LOGGER.error("Failed to fetch instructors", ex);
+            throw ErpException.wrap(ErrorCode.INSTRUCTOR_FETCH_FAILED, ex, Map.of());
         }
     }
 }

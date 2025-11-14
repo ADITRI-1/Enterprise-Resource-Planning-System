@@ -29,7 +29,25 @@ public enum ErrorCode {
     INSTRUCTOR_NOT_FOUND("INST-003", "Instructor with code %s not found"),
     INSTRUCTOR_UPDATE_FAILED("INST-004", "Unable to update instructor %s"),
     INSTRUCTOR_DELETE_FAILED("INST-005", "Unable to delete instructor %s"),
-    INSTRUCTOR_FETCH_FAILED("INST-006", "Unable to fetch instructor %s");
+    INSTRUCTOR_FETCH_FAILED("INST-006", "Unable to fetch instructor %s"),
+    PROGRAM_DUPLICATE("PRG-001", "Program with id %s already exists"),
+    PROGRAM_NOT_FOUND("PRG-002", "Program with id %s not found"),
+    PROGRAM_CREATE_FAILED("PRG-003", "Failed to create program %s"),
+    PROGRAM_UPDATE_FAILED("PRG-004", "Unable to update program %s"),
+    PROGRAM_DELETE_FAILED("PRG-005", "Unable to delete program %s"),
+    PROGRAM_FETCH_FAILED("PRG-006", "Unable to fetch program %s"),
+    DEPARTMENT_DUPLICATE("DEP-001", "Department with id %s already exists"),
+    DEPARTMENT_NOT_FOUND("DEP-002", "Department with id %s not found"),
+    DEPARTMENT_CREATE_FAILED("DEP-003", "Failed to create department %s"),
+    DEPARTMENT_UPDATE_FAILED("DEP-004", "Unable to update department %s"),
+    DEPARTMENT_DELETE_FAILED("DEP-005", "Unable to delete department %s"),
+    DEPARTMENT_FETCH_FAILED("DEP-006", "Unable to fetch department %s"),
+    COURSE_DUPLICATE("CRS-001", "Course with id %s already exists"),
+    COURSE_NOT_FOUND("CRS-002", "Course with id %s not found"),
+    COURSE_CREATE_FAILED("CRS-003", "Failed to create course %s"),
+    COURSE_UPDATE_FAILED("CRS-004", "Unable to update course %s"),
+    COURSE_DELETE_FAILED("CRS-005", "Unable to delete course %s"),
+    COURSE_FETCH_FAILED("CRS-006", "Unable to fetch course %s");
 
     private final String code;
     private final String defaultMessage;

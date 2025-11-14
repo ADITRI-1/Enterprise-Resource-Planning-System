@@ -10,7 +10,7 @@ import lombok.extern.jackson.Jacksonized;
 public record InstructorUpdateRequest(
         String name,
         String dateOfBirth,
-        String department,
+        String deptId,
         String email,
         String phone
 ) {}

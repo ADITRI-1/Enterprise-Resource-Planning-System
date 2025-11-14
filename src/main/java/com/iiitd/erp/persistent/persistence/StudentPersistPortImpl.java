@@ -11,7 +11,9 @@ import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import static com.iiitd.erp.mappers.DomainToEntityMapper.DOMAIN_TO_ENTITY_MAPPER_INSTANCE;
 import static com.iiitd.erp.mappers.EntityToDomainMapper.ENTITY_TO_DOMAIN_MAPPER_INSTANCE;
@@ -94,6 +96,19 @@ public class StudentPersistPortImpl implements StudentPersistPort {
             LOGGER.error("Failed to delete student {}", rollNo, ex);
             throw ErpException.wrap(
                     ErrorCode.STUDENT_DELETE_FAILED, ex, Map.of("rollNo", rollNo));
+        }
+    }
+
+    @Override
+    public List<StudentUserDomain> findAll() {
+        LOGGER.debug("Fetching all students");
+        try {
+            return studentRepository.findAll().stream()
+                    .map(ENTITY_TO_DOMAIN_MAPPER_INSTANCE::studentToStudentUserDomain)
+                    .collect(Collectors.toList());
+        } catch (Exception ex) {
+            LOGGER.error("Failed to fetch students", ex);
+            throw ErpException.wrap(ErrorCode.STUDENT_FETCH_FAILED, ex, Map.of());
         }
     }
 }
