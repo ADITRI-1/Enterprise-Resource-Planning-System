@@ -59,7 +59,9 @@ CREATE TABLE erp_db.instructor (
 	instructor_name varchar(50) not null,
 	dept_id varchar(80) NOT null references erp_db.department(dept_id),
 	email varchar(100),
-	CONSTRAINT instructor_pkey PRIMARY KEY (instructor_id)
+	instructor_code varchar(50) not null,
+	CONSTRAINT instructor_pkey PRIMARY KEY (instructor_id),
+	constraint instructor_code_key unique (instructor_code)
 );
 
 DROP TABLE if exists erp_db.course_details cascade;

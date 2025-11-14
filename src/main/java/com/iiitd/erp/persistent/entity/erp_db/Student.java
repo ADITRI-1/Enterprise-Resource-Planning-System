@@ -29,6 +29,9 @@ public class Student {
     @Column(name = "roll_no", nullable = false, unique = true, length = 50)
     private String rollNo;
 
+    @Column(name = "date_of_birth", nullable = false, length = 10)
+    private String dateOfBirth;
+
     @Column(name = "program_id", nullable = false, length = 120)
     private String program_id;
 

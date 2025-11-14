@@ -1,9 +1,9 @@
 package com.iiitd.erp.mappers;
 
+import com.iiitd.erp.Domain.InstructorDomain;
 import com.iiitd.erp.Domain.LoginRequestDomain;
 import com.iiitd.erp.Domain.StudentUserDomain;
-import com.iiitd.erp.io.dto.request.LoginRequest;
-import com.iiitd.erp.io.dto.request.StudentCreateRequest;
+import com.iiitd.erp.io.dto.request.*;
 import org.mapstruct.Mapper;
 import org.mapstruct.factory.Mappers;
 
@@ -13,5 +13,11 @@ public interface RequestToDomainMapper {
 
     LoginRequestDomain loginRequestToDomain (LoginRequest loginRequest);
 
-    StudentUserDomain studentUserRequestToDomain (StudentCreateRequest studentCreateRequest);
+    StudentUserDomain studentUserRequestToDomain(StudentCreateRequest studentCreateRequest);
+
+    StudentUserDomain studentUpdateRequestToDomain(StudentUpdateRequest studentUpdateRequest);
+
+    InstructorDomain instructorCreateRequestToDomain(InstructorCreateRequest instructorCreateRequest);
+
+    InstructorDomain instructorUpdateRequestToDomain(InstructorUpdateRequest instructorUpdateRequest);
 }

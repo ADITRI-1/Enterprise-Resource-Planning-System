@@ -6,11 +6,12 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.With;
 
+import java.util.UUID;
+
 @Data
 @Builder
 @With
 public class CreateUserDomain {
-    Long id;
     String username;
     Role role;
     AccountStatus status;

@@ -1,6 +1,5 @@
 package com.iiitd.erp.persistent.entity.erp_db;
 
-
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
@@ -21,12 +20,23 @@ import java.util.UUID;
 public class Instructor {
     @Id
     @Column(name = "instructor_id", columnDefinition = "uuid")
-    private UUID instructorId;  // FK to auth_db.user_auth.user_id
+    private UUID instructorId;
 
-    @Column(nullable = false, length = 80)
-    private String department;
+    @Column(name = "instructor_code", nullable = false, unique = true, length = 30)
+    private String instructorCode;
+
+    @Column(name = "instructor_name", nullable = false, length = 80)
+    private String name;
+
+    @Column(name = "date_of_birth", nullable = false, length = 10)
+    private String dateOfBirth;
+
+    @Column(name = "dept_id", nullable = false, length = 80)
+    private String departmentId;
 
     @Column(nullable = false, length = 100)
     private String email;
 
+    @Column(nullable = false, length = 20)
+    private String phone;
 }

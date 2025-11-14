@@ -12,10 +12,10 @@ import java.util.Optional;
 import java.util.UUID;
 
 @Repository
-public interface UsersAuthRepository extends JpaRepository<UserAuth, UUID> {
-  Optional<UserAuth> findByUsername(String username);
+public interface UserAuthRepository extends JpaRepository<UserAuth, UUID> {
+    Optional<UserAuth> findByUsername(String username);
 
-  @Modifying
-  @Query(value = "update auth_db.user_auth set last_login = :ts where username = :user", nativeQuery = true)
-  int updateLastLogin(@Param("user") String username,@Param("ts") OffsetDateTime dateTime);
+    @Modifying
+    @Query(value = "UPDATE auth_db.user_auth SET last_login = :ts WHERE username = :user", nativeQuery = true)
+    int updateLastLogin(@Param("user") String username, @Param("ts") OffsetDateTime dateTime);
 }
