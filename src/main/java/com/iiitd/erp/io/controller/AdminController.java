@@ -6,6 +6,7 @@ import com.iiitd.erp.exception.ErrorCode;
 import com.iiitd.erp.exception.ErpException;
 import com.iiitd.erp.io.dto.request.*;
 import com.iiitd.erp.io.dto.response.*;
+import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -35,19 +36,22 @@ public class AdminController {
     private final DepartmentService departmentService;
     private final CourseService courseService;
     private final RoomService roomService;
+    private final MaintenanceService maintenanceService;
 
     public AdminController(StudentService studentService,
                            InstructorService instructorService,
                            ProgramService programService,
                            DepartmentService departmentService,
                            CourseService courseService,
-                           RoomService roomService) {
+                           RoomService roomService,
+                           MaintenanceService maintenanceService) {
         this.studentService = studentService;
         this.instructorService = instructorService;
         this.programService = programService;
         this.departmentService = departmentService;
         this.courseService = courseService;
         this.roomService = roomService;
+        this.maintenanceService = maintenanceService;
     }
 
     // ----- Student listing + CRUD -----
@@ -596,6 +600,42 @@ public class AdminController {
             return error(HttpStatus.INTERNAL_SERVER_ERROR, ErrorCode.ROOM_DELETE_FAILED);
         }
     }
+
+    @GetMapping("/settings/maintenance")
+    public ResponseEntity<?> maintenanceStatus() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (!isAdmin(auth)) {
+            return error(HttpStatus.FORBIDDEN, ErrorCode.ADMIN_FORBIDDEN);
+        }
+        try {
+            MaintenanceState state = maintenanceService.status();
+            return ResponseEntity.ok(new MaintenanceStatusResponse(state.maintenanceOn(), state.bannerMessage()));
+        } catch (ErpException ex) {
+            return from(ex);
+        } catch (Exception ex) {
+            LOGGER.error("Unexpected maintenance status failure", ex);
+            return error(HttpStatus.INTERNAL_SERVER_ERROR, ErrorCode.MAINTENANCE_STATUS_FETCH_FAILED);
+        }
+    }
+
+    @PutMapping("/settings/maintenance")
+    public ResponseEntity<?> toggleMaintenance(@RequestBody @Valid MaintenanceToggleRequest request) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (!isAdmin(auth)) {
+            return error(HttpStatus.FORBIDDEN, ErrorCode.ADMIN_FORBIDDEN);
+        }
+        try {
+            MaintenanceState state = maintenanceService.updateMaintenanceMode(request.maintenanceOn());
+            LOGGER.info("Admin {} set maintenance mode to {}", auth.getName(), state.maintenanceOn());
+            return ResponseEntity.ok(new MaintenanceStatusResponse(state.maintenanceOn(), state.bannerMessage()));
+        } catch (ErpException ex) {
+            return from(ex);
+        } catch (Exception ex) {
+            LOGGER.error("Unexpected maintenance toggle failure", ex);
+            return error(HttpStatus.INTERNAL_SERVER_ERROR, ErrorCode.MAINTENANCE_UPDATE_FAILED);
+        }
+    }
+
 
     private boolean isAdmin(Authentication authentication) {
         return authentication != null && authentication.getAuthorities().stream()

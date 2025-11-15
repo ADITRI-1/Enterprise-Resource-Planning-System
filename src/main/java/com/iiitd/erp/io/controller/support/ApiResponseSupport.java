@@ -27,7 +27,10 @@ public final class ApiResponseSupport {
             case DUPLICATE_STUDENT -> HttpStatus.CONFLICT;
             case ADMIN_FORBIDDEN -> HttpStatus.FORBIDDEN;
             case AUTH_NOT_AUTHENTICATED, AUTHENTICATION_FAILED -> HttpStatus.UNAUTHORIZED;
-            case STUDENT_REGISTRATION_BLOCKED -> HttpStatus.SERVICE_UNAVAILABLE;
+            case STUDENT_REGISTRATION_BLOCKED,
+                 MAINTENANCE_STATUS_FETCH_FAILED,
+                 MAINTENANCE_UPDATE_FAILED,
+                 MAINTENANCE_WRITE_BLOCKED -> HttpStatus.SERVICE_UNAVAILABLE;
             case STUDENT_REGISTRATION_FAILED, STUDENT_DROP_FAILED -> HttpStatus.BAD_REQUEST;
             default -> HttpStatus.INTERNAL_SERVER_ERROR;
         };

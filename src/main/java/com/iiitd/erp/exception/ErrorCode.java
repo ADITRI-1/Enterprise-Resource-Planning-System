@@ -53,7 +53,10 @@ public enum ErrorCode {
     ROOM_CREATE_FAILED("RM-003", "Failed to create room %s"),
     ROOM_UPDATE_FAILED("RM-004", "Unable to update room %s"),
     ROOM_DELETE_FAILED("RM-005", "Unable to delete room %s"),
-    ROOM_FETCH_FAILED("RM-006", "Unable to fetch room data");
+    ROOM_FETCH_FAILED("RM-006", "Unable to fetch room data"),
+    MAINTENANCE_STATUS_FETCH_FAILED("API-090", "Unable to read maintenance status"),
+    MAINTENANCE_UPDATE_FAILED("API-091", "Unable to update maintenance flag"),
+    MAINTENANCE_WRITE_BLOCKED("API-092", "Write operations are blocked because maintenance mode is ON");
 
     private final String code;
     private final String defaultMessage;
