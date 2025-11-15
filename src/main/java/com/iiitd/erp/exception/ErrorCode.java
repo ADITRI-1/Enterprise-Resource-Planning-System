@@ -47,7 +47,13 @@ public enum ErrorCode {
     COURSE_CREATE_FAILED("CRS-003", "Failed to create course %s"),
     COURSE_UPDATE_FAILED("CRS-004", "Unable to update course %s"),
     COURSE_DELETE_FAILED("CRS-005", "Unable to delete course %s"),
-    COURSE_FETCH_FAILED("CRS-006", "Unable to fetch course %s");
+    COURSE_FETCH_FAILED("CRS-006", "Unable to fetch course %s"),
+    ROOM_DUPLICATE("RM-001", "Room with number %s already exists"),
+    ROOM_NOT_FOUND("RM-002", "Room with id/number %s not found"),
+    ROOM_CREATE_FAILED("RM-003", "Failed to create room %s"),
+    ROOM_UPDATE_FAILED("RM-004", "Unable to update room %s"),
+    ROOM_DELETE_FAILED("RM-005", "Unable to delete room %s"),
+    ROOM_FETCH_FAILED("RM-006", "Unable to fetch room data");
 
     private final String code;
     private final String defaultMessage;

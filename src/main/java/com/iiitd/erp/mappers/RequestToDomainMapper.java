@@ -1,22 +1,7 @@
 package com.iiitd.erp.mappers;
 
-import com.iiitd.erp.Domain.InstructorDomain;
-import com.iiitd.erp.Domain.LoginRequestDomain;
-import com.iiitd.erp.Domain.ProgramDomain;
-import com.iiitd.erp.Domain.DepartmentDomain;
-import com.iiitd.erp.Domain.CourseDomain;
-import com.iiitd.erp.Domain.StudentUserDomain;
-import com.iiitd.erp.io.dto.request.CourseCreateRequest;
-import com.iiitd.erp.io.dto.request.CourseUpdateRequest;
-import com.iiitd.erp.io.dto.request.DepartmentCreateRequest;
-import com.iiitd.erp.io.dto.request.DepartmentUpdateRequest;
-import com.iiitd.erp.io.dto.request.InstructorCreateRequest;
-import com.iiitd.erp.io.dto.request.InstructorUpdateRequest;
-import com.iiitd.erp.io.dto.request.LoginRequest;
-import com.iiitd.erp.io.dto.request.ProgramCreateRequest;
-import com.iiitd.erp.io.dto.request.ProgramUpdateRequest;
-import com.iiitd.erp.io.dto.request.StudentCreateRequest;
-import com.iiitd.erp.io.dto.request.StudentUpdateRequest;
+import com.iiitd.erp.Domain.*;
+import com.iiitd.erp.io.dto.request.*;
 import org.mapstruct.Mapper;
 import org.mapstruct.factory.Mappers;
 
@@ -45,4 +30,8 @@ public interface RequestToDomainMapper {
     CourseDomain courseCreateRequestToDomain(CourseCreateRequest courseCreateRequest);
 
     CourseDomain courseUpdateRequestToDomain(CourseUpdateRequest courseUpdateRequest);
+
+    RoomDomain roomCreateRequestToDomain(RoomCreateRequest request);
+
+    RoomDomain roomUpdateRequestToDomain(RoomUpdateRequest request);
 }

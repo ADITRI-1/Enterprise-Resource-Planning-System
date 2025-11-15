@@ -1,34 +1,11 @@
 package com.iiitd.erp.io.controller;
 
-import com.iiitd.erp.Domain.CourseDomain;
-import com.iiitd.erp.Domain.CreateUserDomain;
-import com.iiitd.erp.Domain.DepartmentDomain;
-import com.iiitd.erp.Domain.InstructorDomain;
-import com.iiitd.erp.Domain.ProgramDomain;
-import com.iiitd.erp.Domain.StudentUserDomain;
-import com.iiitd.erp.core.service.CourseService;
-import com.iiitd.erp.core.service.DepartmentService;
-import com.iiitd.erp.core.service.InstructorService;
-import com.iiitd.erp.core.service.ProgramService;
-import com.iiitd.erp.core.service.StudentService;
+import com.iiitd.erp.Domain.*;
+import com.iiitd.erp.core.service.*;
 import com.iiitd.erp.exception.ErrorCode;
 import com.iiitd.erp.exception.ErpException;
-import com.iiitd.erp.io.dto.request.CourseCreateRequest;
-import com.iiitd.erp.io.dto.request.CourseUpdateRequest;
-import com.iiitd.erp.io.dto.request.DepartmentCreateRequest;
-import com.iiitd.erp.io.dto.request.DepartmentUpdateRequest;
-import com.iiitd.erp.io.dto.request.InstructorCreateRequest;
-import com.iiitd.erp.io.dto.request.InstructorUpdateRequest;
-import com.iiitd.erp.io.dto.request.ProgramCreateRequest;
-import com.iiitd.erp.io.dto.request.ProgramUpdateRequest;
-import com.iiitd.erp.io.dto.request.StudentCreateRequest;
-import com.iiitd.erp.io.dto.request.StudentUpdateRequest;
-import com.iiitd.erp.io.dto.response.CourseResponse;
-import com.iiitd.erp.io.dto.response.CreateUserResponse;
-import com.iiitd.erp.io.dto.response.DepartmentResponse;
-import com.iiitd.erp.io.dto.response.InstructorResponse;
-import com.iiitd.erp.io.dto.response.ProgramResponse;
-import com.iiitd.erp.io.dto.response.StudentResponse;
+import com.iiitd.erp.io.dto.request.*;
+import com.iiitd.erp.io.dto.response.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -57,17 +34,20 @@ public class AdminController {
     private final ProgramService programService;
     private final DepartmentService departmentService;
     private final CourseService courseService;
+    private final RoomService roomService;
 
     public AdminController(StudentService studentService,
                            InstructorService instructorService,
                            ProgramService programService,
                            DepartmentService departmentService,
-                           CourseService courseService) {
+                           CourseService courseService,
+                           RoomService roomService) {
         this.studentService = studentService;
         this.instructorService = instructorService;
         this.programService = programService;
         this.departmentService = departmentService;
         this.courseService = courseService;
+        this.roomService = roomService;
     }
 
     // ----- Student listing + CRUD -----
@@ -524,6 +504,96 @@ public class AdminController {
         } catch (Exception ex) {
             LOGGER.error("Unexpected error while deleting course {}", courseId, ex);
             return error(HttpStatus.INTERNAL_SERVER_ERROR, ErrorCode.COURSE_DELETE_FAILED);
+        }
+    }
+
+
+    // ----- Room listing + CRUD -----
+    @GetMapping("/rooms")
+    public ResponseEntity<?> listRooms() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (!isAdmin(auth)) {
+            LOGGER.warn("Unauthorized attempt to list rooms by {}", auth != null ? auth.getName() : "anonymous");
+            return error(HttpStatus.FORBIDDEN, ErrorCode.ADMIN_FORBIDDEN);
+        }
+        try {
+            List<RoomResponse> response = roomService.listRooms().stream()
+                    .map(DOMAIN_TO_RESPONSE_MAPPER_INSTANCE::roomDomainToResponse)
+                    .collect(Collectors.toList());
+            return ResponseEntity.ok(response);
+        } catch (ErpException ex) {
+            LOGGER.error("Business error while listing rooms: {}", ex.getErrorCode().getCode(), ex);
+            return from(ex);
+        } catch (Exception ex) {
+            LOGGER.error("Unexpected error while listing rooms", ex);
+            return error(HttpStatus.INTERNAL_SERVER_ERROR, ErrorCode.ROOM_FETCH_FAILED);
+        }
+    }
+
+    @PostMapping("/rooms")
+    public ResponseEntity<?> createRoom(@RequestBody RoomCreateRequest request) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (!isAdmin(auth)) {
+            LOGGER.warn("Unauthorized attempt to create room by {}", auth != null ? auth.getName() : "anonymous");
+            return error(HttpStatus.FORBIDDEN, ErrorCode.ADMIN_FORBIDDEN);
+        }
+
+        RoomDomain domain = REQUEST_TO_DOMAIN_MAPPER_INSTANCE.roomCreateRequestToDomain(request);
+        try {
+            RoomResponse response = DOMAIN_TO_RESPONSE_MAPPER_INSTANCE
+                    .roomDomainToResponse(roomService.createRoom(domain));
+            return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        } catch (ErpException ex) {
+            LOGGER.error("Business error while creating room {}: {}", request.roomNumber(), ex.getErrorCode().getCode(), ex);
+            return from(ex);
+        } catch (Exception ex) {
+            LOGGER.error("Unexpected error while creating room {}", request.roomNumber(), ex);
+            return error(HttpStatus.INTERNAL_SERVER_ERROR, ErrorCode.ROOM_CREATE_FAILED);
+        }
+    }
+
+    @PutMapping("/rooms/{roomId}")
+    public ResponseEntity<?> updateRoom(@PathVariable String roomId,
+                                        @RequestBody RoomUpdateRequest request) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (!isAdmin(auth)) {
+            LOGGER.warn("Unauthorized attempt to update room by {}", auth != null ? auth.getName() : "anonymous");
+            return error(HttpStatus.FORBIDDEN, ErrorCode.ADMIN_FORBIDDEN);
+        }
+
+        RoomDomain domain = REQUEST_TO_DOMAIN_MAPPER_INSTANCE.roomUpdateRequestToDomain(request)
+                .withRoomId(roomId);
+
+        try {
+            RoomResponse response = DOMAIN_TO_RESPONSE_MAPPER_INSTANCE
+                    .roomDomainToResponse(roomService.updateRoom(domain));
+            return ResponseEntity.ok(response);
+        } catch (ErpException ex) {
+            LOGGER.error("Business error while updating room {}: {}", roomId, ex.getErrorCode().getCode(), ex);
+            return from(ex);
+        } catch (Exception ex) {
+            LOGGER.error("Unexpected error while updating room {}", roomId, ex);
+            return error(HttpStatus.INTERNAL_SERVER_ERROR, ErrorCode.ROOM_UPDATE_FAILED);
+        }
+    }
+
+    @DeleteMapping("/rooms/{roomId}")
+    public ResponseEntity<?> deleteRoom(@PathVariable String roomId) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (!isAdmin(auth)) {
+            LOGGER.warn("Unauthorized attempt to delete room by {}", auth != null ? auth.getName() : "anonymous");
+            return error(HttpStatus.FORBIDDEN, ErrorCode.ADMIN_FORBIDDEN);
+        }
+
+        try {
+            boolean deleted = roomService.deleteRoom(roomId);
+            return ResponseEntity.ok(Map.of("deleted", deleted, "roomId", roomId));
+        } catch (ErpException ex) {
+            LOGGER.error("Business error while deleting room {}: {}", roomId, ex.getErrorCode().getCode(), ex);
+            return from(ex);
+        } catch (Exception ex) {
+            LOGGER.error("Unexpected error while deleting room {}", roomId, ex);
+            return error(HttpStatus.INTERNAL_SERVER_ERROR, ErrorCode.ROOM_DELETE_FAILED);
         }
     }
 

@@ -18,8 +18,8 @@ import java.util.UUID;
 @Table(name = "rooms", schema = "erp_db")
 public class Room {
     @Id
-    @Column(name = "room_id", columnDefinition = "uuid")
-    private UUID roomId;
+    @Column(name = "room_id")
+    private String roomId;
 
     @Column(name = "room_number", nullable = false, unique = true, length = 20)
     private String roomNumber;
