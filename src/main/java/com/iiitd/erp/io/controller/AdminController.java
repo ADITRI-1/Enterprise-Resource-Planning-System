@@ -665,7 +665,7 @@ public class AdminController {
             return error(HttpStatus.FORBIDDEN, ErrorCode.ADMIN_FORBIDDEN);
         }
         try {
-            SectionDomain created = sectionService.createSection(courseId, request);
+            SectionDomain created = sectionService.createSection(courseId, REQUEST_TO_DOMAIN_MAPPER_INSTANCE.sectionCreateRequestToDomain(request));
             return ResponseEntity.status(HttpStatus.CREATED)
                     .body(DOMAIN_TO_RESPONSE_MAPPER_INSTANCE.sectionDomainToResponse(created));
         } catch (ErpException ex) {
@@ -681,7 +681,7 @@ public class AdminController {
             return error(HttpStatus.FORBIDDEN, ErrorCode.ADMIN_FORBIDDEN);
         }
         try {
-            SectionDomain updated = sectionService.updateSection(sectionId, request);
+            SectionDomain updated = sectionService.updateSection(sectionId, REQUEST_TO_DOMAIN_MAPPER_INSTANCE.sectionUpdateRequestToDomain(request));
             return ResponseEntity.ok(DOMAIN_TO_RESPONSE_MAPPER_INSTANCE.sectionDomainToResponse(updated));
         } catch (ErpException ex) {
             return from(ex);

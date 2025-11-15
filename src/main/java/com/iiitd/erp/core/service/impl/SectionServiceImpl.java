@@ -10,14 +10,11 @@ import com.iiitd.erp.core.service.SectionService;
 import com.iiitd.erp.core.service.support.SemesterTerm;
 import com.iiitd.erp.exception.ErrorCode;
 import com.iiitd.erp.exception.ErpException;
-import com.iiitd.erp.io.dto.request.SectionCreateRequest;
-import com.iiitd.erp.io.dto.request.SectionUpdateRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.text.Normalizer;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -42,12 +39,11 @@ public class SectionServiceImpl implements SectionService {
     }
 
     @Override
-    public SectionDomain createSection(String courseId, SectionCreateRequest request) {
+    public SectionDomain createSection(String courseId, SectionDomain sectionDomain) {
         CourseDomain course = ensureCourse(courseId);
-        InstructorDomain instructor = ensureInstructorByCode(request.instructorCode());
-        String semester = normalizeSemester(request.semester());
-        SemesterTerm term = parseSemester(request.semester());
-        String sectionId = buildSectionId(course.getCourseId(), instructor.getInstructorCode(), request.year(), term);
+        InstructorDomain instructor = ensureInstructorByCode(sectionDomain.getInstructorCode());
+        SemesterTerm term = parseSemester(sectionDomain.getSemester());
+        String sectionId = buildSectionId(course.getCourseId(), instructor.getInstructorCode(), sectionDomain.getYear(), term);
 
         LOGGER.info("Creating section {} for course {}", sectionId, courseId);
         if (sections.findBySectionId(sectionId) != null) {
@@ -59,11 +55,11 @@ public class SectionServiceImpl implements SectionService {
                 .courseId(course.getCourseId())
                 .instructorId(instructor.getInstructorId())
                 .semester(term.label())
-                .year(request.year())
-                .capacity(request.capacity())
+                .year(sectionDomain.getYear())
+                .capacity(sectionDomain.getCapacity())
                 .enrollmentCount(0)
-                .active(request.active() == null ? Boolean.TRUE : request.active())
-                .registrationDeadline(request.registrationDeadline())
+                .active(sectionDomain.getActive() == null ? Boolean.TRUE : sectionDomain.getActive())
+                .registrationDeadline(sectionDomain.getRegistrationDeadline())
                 .build();
 
         try {
@@ -79,17 +75,16 @@ public class SectionServiceImpl implements SectionService {
     }
 
     @Override
-    public SectionDomain updateSection(String sectionId, SectionUpdateRequest request) {
+    public SectionDomain updateSection(String sectionId, SectionDomain sectionDomain) {
         LOGGER.info("Updating section {}", sectionId);
         SectionDomain existing = sections.findBySectionId(sectionId);
         if (existing == null) {
             throw ErpException.of(ErrorCode.SECTION_NOT_FOUND, Map.of("sectionId", sectionId));
         }
 
-        InstructorDomain instructor = ensureInstructorByCode(request.instructorCode());
-        String semester = normalizeSemester(request.semester());
-        SemesterTerm term = parseSemester(request.semester());
-        String expectedId = buildSectionId(existing.getCourseId(), instructor.getInstructorCode(), request.year(), term);
+        InstructorDomain instructor = ensureInstructorByCode(sectionDomain.getInstructorCode());
+        SemesterTerm term = parseSemester(sectionDomain.getSemester());
+        String expectedId = buildSectionId(existing.getCourseId(), instructor.getInstructorCode(), sectionDomain.getYear(), term);
         if (!expectedId.equals(sectionId)) {
             throw ErpException.of(ErrorCode.SECTION_ID_IMMUTABLE,
                     Map.of("sectionId", sectionId, "expectedSectionId", expectedId));
@@ -98,10 +93,10 @@ public class SectionServiceImpl implements SectionService {
         SectionDomain payload = existing
                 .withInstructorId(instructor.getInstructorId())
                 .withSemester(term.label())
-                .withYear(request.year())
-                .withCapacity(request.capacity())
-                .withActive(request.active())
-                .withRegistrationDeadline(request.registrationDeadline());
+                .withYear(sectionDomain.getYear())
+                .withCapacity(sectionDomain.getCapacity())
+                .withActive(sectionDomain.getActive())
+                .withRegistrationDeadline(sectionDomain.getRegistrationDeadline());
 
         try {
             SectionDomain saved = sections.update(payload);
@@ -170,10 +165,6 @@ public class SectionServiceImpl implements SectionService {
         InstructorDomain instructor = instructors.findByInstructorCode(section.getInstructorCode());
         String code = instructor != null ? instructor.getInstructorCode() : null;
         return section.withInstructorCode(code);
-    }
-
-    private String normalizeSemester(String semester) {
-        return Normalizer.normalize(semester, Normalizer.Form.NFKC).trim().toUpperCase(Locale.ROOT);
     }
 
     private SemesterTerm parseSemester(String semester) {

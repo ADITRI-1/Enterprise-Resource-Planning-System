@@ -34,4 +34,8 @@ public interface RequestToDomainMapper {
     RoomDomain roomCreateRequestToDomain(RoomCreateRequest request);
 
     RoomDomain roomUpdateRequestToDomain(RoomUpdateRequest request);
+
+    SectionDomain sectionCreateRequestToDomain(SectionCreateRequest request);
+
+    SectionDomain sectionUpdateRequestToDomain(SectionUpdateRequest request);
 }
