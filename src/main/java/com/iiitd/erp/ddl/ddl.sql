@@ -18,7 +18,24 @@ CREATE TABLE auth_db.user_auth (
 	CONSTRAINT user_auth_username_key UNIQUE (username)
 );
 
+DROP TABLE if exists erp_db.settings cascade;
 DROP TABLE if exists erp_db.program cascade;
+DROP TABLE if exists erp_db.rooms;
+DROP TABLE if exists erp_db.student cascade;
+DROP TABLE if exists erp_db.department cascade;
+DROP TABLE if exists erp_db.instructor cascade;
+DROP TABLE if exists erp_db.course_details cascade;
+DROP TABLE if exists erp_db.sections cascade;
+
+
+CREATE TABLE erp_db.settings (
+  key   VARCHAR(100) PRIMARY KEY,
+  value VARCHAR(255) NOT NULL
+);
+
+INSERT INTO erp_db.settings (key, value)
+VALUES ('maintenanceMode', 'false')
+ON CONFLICT (key) DO NOTHING;
 
 CREATE TABLE erp_db.program (
 	program_id varchar(50) NOT null,
@@ -28,8 +45,19 @@ CREATE TABLE erp_db.program (
 	CONSTRAINT program_pkey PRIMARY KEY (program_id)
 );
 
+CREATE TABLE erp_db.rooms (
+  room_id      UUID PRIMARY key,
+  room_number  VARCHAR(20)  NOT NULL UNIQUE,
+  building     VARCHAR(100) NOT NULL,
+  capacity     INTEGER      NOT NULL CHECK (capacity > 0),
+  type         VARCHAR(40)  NULL
+);
 
-DROP TABLE if exists erp_db.student cascade;
+CREATE TABLE erp_db.department (
+	dept_id varchar(50) NOT null,
+	dept_desc varchar(255) not null,
+	CONSTRAINT department_pkey PRIMARY KEY (dept_id)
+);
 
 CREATE TABLE erp_db.student (
 	student_id uuid NOT null references auth_db.user_auth(user_id),
@@ -42,18 +70,6 @@ CREATE TABLE erp_db.student (
 	CONSTRAINT student_year_check CHECK (((year >= 1) AND (year <= 10)))
 );
 
-
-DROP TABLE if exists erp_db.department cascade;
-
-CREATE TABLE erp_db.department (
-	dept_id varchar(50) NOT null,
-	dept_desc varchar(255) not null,
-	CONSTRAINT department_pkey PRIMARY KEY (dept_id)
-);
-
-
-DROP TABLE if exists erp_db.instructor cascade;
-
 CREATE TABLE erp_db.instructor (
 	instructor_id uuid NOT null	references auth_db.user_auth(user_id) ,
 	instructor_name varchar(50) not null,
@@ -64,8 +80,6 @@ CREATE TABLE erp_db.instructor (
 	constraint instructor_code_key unique (instructor_code)
 );
 
-DROP TABLE if exists erp_db.course_details cascade;
-
 CREATE TABLE erp_db.course_details (
 	course_id varchar(255) NOT NULL,
 	title varchar(255) NOT NULL,
@@ -75,13 +89,11 @@ CREATE TABLE erp_db.course_details (
 	CONSTRAINT course_detail_pkey PRIMARY KEY (course_id)
 );
 
-DROP TABLE if exists erp_db.sections cascade;
-
 CREATE TABLE erp_db.sections (
   section_id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   course_id           	VARCHAR(64)  NOT null REFERENCES erp_db.course_details(course_id),
   instructor_id         UUID null REFERENCES erp_db.instructor(instructor_id),
-  semester              VARCHAR(20)  NOT NULL,         -- e.g., 'Fall 2024'
+  semester              VARCHAR(20)  NOT NULL,
   year                  INTEGER      NOT NULL CHECK (year BETWEEN 2000 AND 2100),
   capacity              INTEGER      NOT NULL CHECK (capacity > 0),
   enrollment_count      INTEGER      NOT NULL DEFAULT 0 CHECK (enrollment_count >= 0),
@@ -93,21 +105,9 @@ CREATE TABLE erp_db.sections (
 -- Helpful indexes for common queries
 --CREATE INDEX IF NOT EXISTS idx_sections_course_sem ON public.sections (course_code, semester, year);
 --CREATE INDEX IF NOT EXISTS idx_sections_deadline   ON public.sections (registration_deadline);
-
-
--- DROP TABLE if exists erp_db.rooms;
-
-CREATE TABLE erp_db.rooms (
-  room_id      UUID PRIMARY key,
-  room_number  VARCHAR(20)  NOT NULL UNIQUE,             -- e.g., 'A101'
-  building     VARCHAR(100) NOT NULL,
-  capacity     INTEGER      NOT NULL CHECK (capacity > 0),
-  type         VARCHAR(40)  NULL                         -- e.g., 'Lecture Hal', 'Lab'
-);
-
 -- Helpful indexes for scheduling/search
-CREATE INDEX IF NOT EXISTS idx_rooms_building ON erp_db.rooms (building);
-CREATE INDEX IF NOT EXISTS idx_rooms_capacity ON erp_db.rooms (capacity);
+--CREATE INDEX IF NOT EXISTS idx_rooms_building ON erp_db.rooms (building);
+--CREATE INDEX IF NOT EXISTS idx_rooms_capacity ON erp_db.rooms (capacity);
 
 
  DROP TABLE if exists erp_db.class_schedules;
@@ -222,11 +222,6 @@ CREATE UNIQUE INDEX uq_assessment_components_section_name
 -- Helpful indexes
 CREATE INDEX idx_assessment_components_section  ON erp_db.assessment_components (section_id);
 CREATE INDEX idx_assessment_components_due_date ON erp_db.assessment_components (due_date);
-
-CREATE TABLE erp_db.settings (
-  key   VARCHAR(100) PRIMARY KEY,   -- e.g., 'maintenance_on'
-  value VARCHAR(255) NOT NULL       -- e.g., 'true', '2025', 'yes'
-);
 
 SET search_path TO som;
 

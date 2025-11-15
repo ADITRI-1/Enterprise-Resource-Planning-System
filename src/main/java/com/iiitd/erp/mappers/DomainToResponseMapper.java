@@ -24,4 +24,6 @@ public interface DomainToResponseMapper {
     CourseResponse courseDomainToResponse(CourseDomain courseDomain);
 
     RoomResponse roomDomainToResponse(RoomDomain roomDomain);
+
+    SectionResponse sectionDomainToResponse(SectionDomain sectionDomain);
 }

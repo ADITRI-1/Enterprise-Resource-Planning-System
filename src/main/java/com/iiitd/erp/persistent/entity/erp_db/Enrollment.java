@@ -26,8 +26,8 @@ public class Enrollment {
     @Column(name = "student_id", columnDefinition = "uuid", nullable = false)
     private UUID studentId;
 
-    @Column(name = "section_id", columnDefinition = "uuid", nullable = false)
-    private UUID sectionId;
+    @Column(name = "section_id", length = 80, nullable = false)
+    private String sectionId;
 
     @Column(name = "enrollment_date", nullable = false)
     private OffsetDateTime enrollmentDate;

@@ -8,6 +8,7 @@ import lombok.With;
 @Builder
 @With
 public class InstructorDomain {
+    private String instructorId;
     private String name;
     private String instructorCode;
     private String dateOfBirth;

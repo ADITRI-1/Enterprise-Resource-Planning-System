@@ -21,8 +21,8 @@ public class ClassSchedule {
     @Column(name = "schedule_id", columnDefinition = "uuid")
     private UUID scheduleId;
 
-    @Column(name = "section_id", columnDefinition = "uuid", nullable = false)
-    private UUID sectionId;
+    @Column(name = "section_id", length = 80, nullable = false)
+    private String sectionId;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "day_of_week", nullable = false, columnDefinition = "weekday")

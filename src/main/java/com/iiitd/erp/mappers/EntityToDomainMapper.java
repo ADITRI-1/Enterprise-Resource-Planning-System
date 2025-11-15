@@ -23,4 +23,6 @@ public interface EntityToDomainMapper {
     CourseDomain courseToCourseDomain(Course course);
 
     RoomDomain roomToRoomDomain (Room room);
+
+    SectionDomain sectionToSectionDomain(Section section);
 }

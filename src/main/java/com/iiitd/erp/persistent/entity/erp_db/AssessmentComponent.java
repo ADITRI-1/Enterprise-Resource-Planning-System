@@ -23,8 +23,8 @@ public class AssessmentComponent {
     @Column(name = "component_id", columnDefinition = "uuid")
     private UUID componentId;
 
-    @Column(name = "section_id", columnDefinition = "uuid", nullable = false)
-    private UUID sectionId;
+    @Column(name = "section_id", length = 80, nullable = false)
+    private String sectionId;
 
     @Column(nullable = false, length = 80)
     private String name;

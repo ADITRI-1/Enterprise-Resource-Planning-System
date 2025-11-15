@@ -37,6 +37,7 @@ public class AdminController {
     private final CourseService courseService;
     private final RoomService roomService;
     private final MaintenanceService maintenanceService;
+    private final SectionService sectionService;
 
     public AdminController(StudentService studentService,
                            InstructorService instructorService,
@@ -44,7 +45,8 @@ public class AdminController {
                            DepartmentService departmentService,
                            CourseService courseService,
                            RoomService roomService,
-                           MaintenanceService maintenanceService) {
+                           MaintenanceService maintenanceService,
+                           SectionService sectionService) {
         this.studentService = studentService;
         this.instructorService = instructorService;
         this.programService = programService;
@@ -52,6 +54,7 @@ public class AdminController {
         this.courseService = courseService;
         this.roomService = roomService;
         this.maintenanceService = maintenanceService;
+        this.sectionService = sectionService;
     }
 
     // ----- Student listing + CRUD -----
@@ -636,6 +639,68 @@ public class AdminController {
         }
     }
 
+    @GetMapping("/courses/{courseId}/sections")
+    public ResponseEntity<?> listSections(@PathVariable String courseId,
+                                          @RequestParam(required = false) String semester,
+                                          @RequestParam(required = false) Integer year) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (!isAdmin(auth)) {
+            return error(HttpStatus.FORBIDDEN, ErrorCode.ADMIN_FORBIDDEN);
+        }
+        try {
+            List<SectionResponse> response = sectionService.listSections(courseId, semester, year).stream()
+                    .map(DOMAIN_TO_RESPONSE_MAPPER_INSTANCE::sectionDomainToResponse)
+                    .toList();
+            return ResponseEntity.ok(response);
+        } catch (ErpException ex) {
+            return from(ex);
+        }
+    }
+
+    @PostMapping("/courses/{courseId}/sections")
+    public ResponseEntity<?> createSection(@PathVariable String courseId,
+                                           @RequestBody @Valid SectionCreateRequest request) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (!isAdmin(auth)) {
+            return error(HttpStatus.FORBIDDEN, ErrorCode.ADMIN_FORBIDDEN);
+        }
+        try {
+            SectionDomain created = sectionService.createSection(courseId, request);
+            return ResponseEntity.status(HttpStatus.CREATED)
+                    .body(DOMAIN_TO_RESPONSE_MAPPER_INSTANCE.sectionDomainToResponse(created));
+        } catch (ErpException ex) {
+            return from(ex);
+        }
+    }
+
+    @PutMapping("/sections/{sectionId}")
+    public ResponseEntity<?> updateSection(@PathVariable String sectionId,
+                                           @RequestBody @Valid SectionUpdateRequest request) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (!isAdmin(auth)) {
+            return error(HttpStatus.FORBIDDEN, ErrorCode.ADMIN_FORBIDDEN);
+        }
+        try {
+            SectionDomain updated = sectionService.updateSection(sectionId, request);
+            return ResponseEntity.ok(DOMAIN_TO_RESPONSE_MAPPER_INSTANCE.sectionDomainToResponse(updated));
+        } catch (ErpException ex) {
+            return from(ex);
+        }
+    }
+
+    @DeleteMapping("/sections/{sectionId}")
+    public ResponseEntity<?> deleteSection(@PathVariable String sectionId) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (!isAdmin(auth)) {
+            return error(HttpStatus.FORBIDDEN, ErrorCode.ADMIN_FORBIDDEN);
+        }
+        try {
+            boolean deleted = sectionService.deleteSection(sectionId);
+            return ResponseEntity.ok(Map.of("sectionId", sectionId, "deleted", deleted));
+        } catch (ErpException ex) {
+            return from(ex);
+        }
+    }
 
     private boolean isAdmin(Authentication authentication) {
         return authentication != null && authentication.getAuthorities().stream()

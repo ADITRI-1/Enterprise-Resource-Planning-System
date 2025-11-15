@@ -22,14 +22,14 @@ import java.util.UUID;
 @Table(name = "sections", schema = "erp_db")
 public class Section {
     @Id
-    @Column(name = "section_id", columnDefinition = "uuid")
-    private UUID sectionId;
+    @Column(name = "section_id", length = 80, nullable = false)
+    private String sectionId;
 
     @Column(name = "course_id", nullable = false, length = 64)
     private String courseId;            // FK to erp_db.course_details.id (string)
 
-    @Column(name = "instructor_id", columnDefinition = "uuid")
-    private UUID instructorId;            // nullable
+    @Column(name = "instructor_code", length = 50, nullable = false)
+    private String instructorCode;            // nullable
 
     @Column(nullable = false, length = 20)
     private String semester;

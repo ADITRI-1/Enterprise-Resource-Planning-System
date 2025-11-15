@@ -56,7 +56,16 @@ public enum ErrorCode {
     ROOM_FETCH_FAILED("RM-006", "Unable to fetch room data"),
     MAINTENANCE_STATUS_FETCH_FAILED("API-090", "Unable to read maintenance status"),
     MAINTENANCE_UPDATE_FAILED("API-091", "Unable to update maintenance flag"),
-    MAINTENANCE_WRITE_BLOCKED("API-092", "Write operations are blocked because maintenance mode is ON");
+    MAINTENANCE_WRITE_BLOCKED("API-092", "Write operations are blocked because maintenance mode is ON"),
+    SECTION_DUPLICATE("SEC-001", "Section %s already exists"),
+    SECTION_NOT_FOUND("SEC-002", "Section %s not found"),
+    SECTION_CREATE_FAILED("SEC-003", "Failed to create section %s"),
+    SECTION_UPDATE_FAILED("SEC-004", "Unable to update section %s"),
+    SECTION_DELETE_FAILED("SEC-005", "Unable to delete section %s"),
+    SECTION_LIST_FAILED("SEC-006", "Unable to list sections for course %s"),
+    SECTION_FETCH_FAILED("SEC-007", "Unable to fetch section %s"),
+    SECTION_INVALID_SEMESTER("SEC-009", "Semester must be Monsoon or Winter"),
+    SECTION_ID_IMMUTABLE("SEC-008", "Section id %s must remain %s");
 
     private final String code;
     private final String defaultMessage;
