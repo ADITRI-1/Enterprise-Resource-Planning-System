@@ -33,4 +33,6 @@ public interface DomainToResponseMapper {
 
     InstructorSectionResponse sectionDomainToInstructorSectionResponse(SectionDomain sectionDomain);
 
+    InstructorTimetableSlotResponse instructorTimetableSlotDomainToResponse(InstructorTimetableSlotDomain domain);
+
 }

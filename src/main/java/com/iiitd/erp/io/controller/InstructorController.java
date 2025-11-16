@@ -3,11 +3,13 @@ package com.iiitd.erp.io.controller;
 import com.iiitd.erp.Domain.AssessmentComponentDomain;
 import com.iiitd.erp.core.service.AssessmentService;
 import com.iiitd.erp.core.service.SectionService;
+import com.iiitd.erp.core.service.TimetableService;
 import com.iiitd.erp.exception.ErrorCode;
 import com.iiitd.erp.exception.ErpException;
 import com.iiitd.erp.io.dto.request.AssessmentComponentRequest;
 import com.iiitd.erp.io.dto.response.AssessmentComponentResponse;
 import com.iiitd.erp.io.dto.response.InstructorSectionResponse;
+import com.iiitd.erp.io.dto.response.InstructorTimetableSlotResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -33,11 +35,16 @@ public class InstructorController {
 
     private final AssessmentService assessments;
     private final SectionService sectionService;
+    private final TimetableService timetableService;
 
-    public InstructorController(AssessmentService assessments, SectionService sectionService) {
+    public InstructorController(AssessmentService assessments,
+                                SectionService sectionService,
+                                TimetableService timetableService) {
         this.assessments = assessments;
         this.sectionService = sectionService;
+        this.timetableService = timetableService;
     }
+
 
     @GetMapping("/{instructorCode}/sections/{sectionId}/assessments")
     public ResponseEntity<?> listAssessments(@PathVariable String instructorCode,
@@ -147,6 +154,31 @@ public class InstructorController {
             return error(HttpStatus.INTERNAL_SERVER_ERROR, ErrorCode.SECTION_LIST_FAILED);
         }
     }
+
+    @GetMapping("/{instructorCode}/timetable")
+    public ResponseEntity<?> timetable(@PathVariable String instructorCode,
+                                       @RequestParam(required = false) String semester,
+                                       @RequestParam(required = false) Integer year) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (!isInstructor(auth, instructorCode)) {
+            LOGGER.warn("Unauthorized timetable request by {}", auth != null ? auth.getName() : "anonymous");
+            return error(HttpStatus.FORBIDDEN, ErrorCode.INSTRUCTOR_FORBIDDEN);
+        }
+        try {
+            List<InstructorTimetableSlotResponse> response = timetableService
+                    .timetable(instructorCode, semester, year).stream()
+                    .map(DOMAIN_TO_RESPONSE_MAPPER_INSTANCE::instructorTimetableSlotDomainToResponse)
+                    .toList();
+            return ResponseEntity.ok(response);
+        } catch (ErpException ex) {
+            LOGGER.error("Timetable fetch failed for instructor {}", instructorCode, ex);
+            return from(ex);
+        } catch (Exception ex) {
+            LOGGER.error("Unexpected timetable failure for instructor {}", instructorCode, ex);
+            return error(HttpStatus.INTERNAL_SERVER_ERROR, ErrorCode.SECTION_LIST_FAILED);
+        }
+    }
+
 
     private boolean isInstructor(Authentication auth, String expectedCode) {
         return auth == null

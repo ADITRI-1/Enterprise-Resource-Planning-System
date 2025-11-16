@@ -55,4 +55,7 @@ public interface ClassScheduleRepository extends JpaRepository<ClassSchedule, UU
                                                 @Param("year") Integer year);
 
     void deleteBySectionId(String sectionId);
+
+
+    List<ClassSchedule> findBySectionIdInOrderByDayOfWeekAscStartTimeAsc(List<String> sectionIds);
 }
