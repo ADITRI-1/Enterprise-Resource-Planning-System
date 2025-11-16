@@ -4,7 +4,10 @@ import com.iiitd.erp.Domain.*;
 import com.iiitd.erp.persistent.entity.auth_db.UserAuth;
 import com.iiitd.erp.persistent.entity.erp_db.*;
 import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
 import org.mapstruct.factory.Mappers;
+
+import java.time.DayOfWeek;
 
 @Mapper
 public interface DomainToEntityMapper {
@@ -25,5 +28,14 @@ public interface DomainToEntityMapper {
     Room roomDomainToRoom(RoomDomain roomDomain);
 
     Section sectionDomainToSection(SectionDomain sectionDomain);
+
+    @Mapping(target = "dayOfWeek", expression = "java(toWeekday(classScheduleDomain.getDayOfWeek()))")
+    @Mapping(target = "section", ignore = true)
+    ClassSchedule classScheduleDomainToClassSchedule(ClassScheduleDomain classScheduleDomain);
+
+    default Weekday toWeekday(DayOfWeek day) {
+        return day == null ? null : Weekday.from(day);
+    }
+
 
 }

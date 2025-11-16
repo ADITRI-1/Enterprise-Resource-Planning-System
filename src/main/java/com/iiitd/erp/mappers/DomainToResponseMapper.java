@@ -26,4 +26,7 @@ public interface DomainToResponseMapper {
     RoomResponse roomDomainToResponse(RoomDomain roomDomain);
 
     SectionResponse sectionDomainToResponse(SectionDomain sectionDomain);
+
+    ScheduleSlotResponse classScheduleDomainToScheduleSlotResponse(ClassScheduleDomain classScheduleDomain);
+
 }

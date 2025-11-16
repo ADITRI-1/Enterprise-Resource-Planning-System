@@ -34,9 +34,9 @@ public class Instructor {
     @Column(name = "dept_id", nullable = false, length = 80)
     private String departmentId;
 
-    @Column(nullable = false, length = 100)
+    @Column(name = "email")
     private String email;
 
-    @Column(nullable = false, length = 20)
+    @Column(name = "phone")
     private String phone;
 }

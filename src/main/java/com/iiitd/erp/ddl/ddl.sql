@@ -37,6 +37,12 @@ INSERT INTO erp_db.settings (key, value)
 VALUES ('maintenanceMode', 'false')
 ON CONFLICT (key) DO NOTHING;
 
+INSERT INTO erp_db.settings (key, value) VALUES
+    ('workingHours.start', '08:00'),
+    ('workingHours.end',   '20:00')
+ON CONFLICT (key) DO NOTHING;
+
+
 CREATE TABLE erp_db.program (
 	program_id varchar(50) NOT null,
 	program_desc varchar(255) not null,

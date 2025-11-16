@@ -65,7 +65,13 @@ public enum ErrorCode {
     SECTION_LIST_FAILED("SEC-006", "Unable to list sections for course %s"),
     SECTION_FETCH_FAILED("SEC-007", "Unable to fetch section %s"),
     SECTION_INVALID_SEMESTER("SEC-009", "Semester must be Monsoon or Winter"),
-    SECTION_ID_IMMUTABLE("SEC-008", "Section id %s must remain %s");
+    SECTION_ID_IMMUTABLE("SEC-008", "Section id %s must remain %s"),
+    SCHEDULE_OUTSIDE_WORKING_HOURS("SCH-001", "Requested slot %s-%s falls outside working hours"),
+    SCHEDULE_ROOM_CONFLICT("SCH-002", "Room %s is already booked for that slot"),
+    SCHEDULE_INSTRUCTOR_CONFLICT("SCH-003", "Instructor %s has another class in that slot"),
+    SCHEDULE_ROOM_CAPACITY_MISMATCH("SCH-004", "Room %s capacity %s cannot host section %s (needs %s)"),
+    SCHEDULE_SLOT_INVALID("SCH-005", "Invalid schedule slot definition");
+
 
     private final String code;
     private final String defaultMessage;

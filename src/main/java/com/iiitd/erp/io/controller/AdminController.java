@@ -2,6 +2,7 @@ package com.iiitd.erp.io.controller;
 
 import com.iiitd.erp.Domain.*;
 import com.iiitd.erp.core.service.*;
+import com.iiitd.erp.core.service.dto.SectionScheduleResult;
 import com.iiitd.erp.exception.ErrorCode;
 import com.iiitd.erp.exception.ErpException;
 import com.iiitd.erp.io.dto.request.*;
@@ -9,12 +10,15 @@ import com.iiitd.erp.io.dto.response.*;
 import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.DayOfWeek;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -38,6 +42,9 @@ public class AdminController {
     private final RoomService roomService;
     private final MaintenanceService maintenanceService;
     private final SectionService sectionService;
+    private final AvailabilityService availabilityService;
+    private final SectionScheduleService sectionScheduleService;
+
 
     public AdminController(StudentService studentService,
                            InstructorService instructorService,
@@ -46,7 +53,9 @@ public class AdminController {
                            CourseService courseService,
                            RoomService roomService,
                            MaintenanceService maintenanceService,
-                           SectionService sectionService) {
+                           SectionService sectionService,
+                           AvailabilityService availabilityService,
+                           SectionScheduleService sectionScheduleService) {
         this.studentService = studentService;
         this.instructorService = instructorService;
         this.programService = programService;
@@ -55,6 +64,8 @@ public class AdminController {
         this.roomService = roomService;
         this.maintenanceService = maintenanceService;
         this.sectionService = sectionService;
+        this.availabilityService = availabilityService;
+        this.sectionScheduleService = sectionScheduleService;
     }
 
     // ----- Student listing + CRUD -----
@@ -701,6 +712,111 @@ public class AdminController {
             return from(ex);
         }
     }
+
+    @GetMapping("/rooms/available")
+    public ResponseEntity<?> availableRooms(@RequestParam DayOfWeek day,
+                                            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.TIME) LocalTime start,
+                                            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.TIME) LocalTime end,
+                                            @RequestParam int minCapacity) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (!isAdmin(auth)) {
+            return error(HttpStatus.FORBIDDEN, ErrorCode.ADMIN_FORBIDDEN);
+        }
+        try {
+            return ResponseEntity.ok(availabilityService.availableRooms(day, start, end, minCapacity));
+        } catch (ErpException ex) {
+            return from(ex);
+        } catch (Exception ex) {
+            LOGGER.error("Unexpected room availability failure", ex);
+            return error(HttpStatus.INTERNAL_SERVER_ERROR, ErrorCode.ROOM_FETCH_FAILED);
+        }
+    }
+
+    @GetMapping("/instructors/{code}/availability")
+    public ResponseEntity<?> instructorAvailability(@PathVariable String code,
+                                                    @RequestParam String semester,
+                                                    @RequestParam int year) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (!isAdmin(auth)) {
+            return error(HttpStatus.FORBIDDEN, ErrorCode.ADMIN_FORBIDDEN);
+        }
+        try {
+            return ResponseEntity.ok(availabilityService.instructorAvailability(code, semester, year));
+        } catch (ErpException ex) {
+            return from(ex);
+        } catch (Exception ex) {
+            LOGGER.error("Unexpected instructor availability failure", ex);
+            return error(HttpStatus.INTERNAL_SERVER_ERROR, ErrorCode.INSTRUCTOR_FETCH_FAILED);
+        }
+    }
+
+    @GetMapping("/sections/{sectionId}/schedule")
+    public ResponseEntity<?> viewSchedule(@PathVariable String sectionId) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (!isAdmin(auth)) {
+            return error(HttpStatus.FORBIDDEN, ErrorCode.ADMIN_FORBIDDEN);
+        }
+        try {
+            SectionScheduleResult result = sectionScheduleService.view(sectionId);
+            return ResponseEntity.ok(toScheduleResponse(result));
+        } catch (ErpException ex) {
+            return from(ex);
+        } catch (Exception ex) {
+            LOGGER.error("Unexpected error fetching schedule for section {}", sectionId, ex);
+            return error(HttpStatus.INTERNAL_SERVER_ERROR, ErrorCode.SECTION_FETCH_FAILED);
+        }
+    }
+
+    @PutMapping("/sections/{sectionId}/schedule")
+    public ResponseEntity<?> upsertSchedule(@PathVariable String sectionId,
+                                            @RequestBody @Valid SectionScheduleRequest request) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (!isAdmin(auth)) {
+            return error(HttpStatus.FORBIDDEN, ErrorCode.ADMIN_FORBIDDEN);
+        }
+        try {
+            List<ClassScheduleDomain> slots = request.slots().stream()
+                    .map(REQUEST_TO_DOMAIN_MAPPER_INSTANCE::scheduleSlotRequestToDomain)
+                    .map(domain -> domain.withSectionId(sectionId))
+                    .toList();
+            SectionScheduleResult result = sectionScheduleService.replace(sectionId, slots);
+            return ResponseEntity.ok(toScheduleResponse(result));
+        } catch (ErpException ex) {
+            return from(ex);
+        } catch (Exception ex) {
+            LOGGER.error("Unexpected error saving schedule for {}", sectionId, ex);
+            return error(HttpStatus.INTERNAL_SERVER_ERROR, ErrorCode.SECTION_UPDATE_FAILED);
+        }
+    }
+
+    @DeleteMapping("/sections/{sectionId}/schedule")
+    public ResponseEntity<?> deleteSchedule(@PathVariable String sectionId) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (!isAdmin(auth)) {
+            return error(HttpStatus.FORBIDDEN, ErrorCode.ADMIN_FORBIDDEN);
+        }
+        try {
+            sectionScheduleService.clear(sectionId);
+            return ResponseEntity.ok(Map.of("sectionId", sectionId, "deleted", true));
+        } catch (ErpException ex) {
+            return from(ex);
+        } catch (Exception ex) {
+            LOGGER.error("Unexpected error clearing schedule for {}", sectionId, ex);
+            return error(HttpStatus.INTERNAL_SERVER_ERROR, ErrorCode.SECTION_DELETE_FAILED);
+        }
+    }
+
+    private SectionScheduleResponse toScheduleResponse(SectionScheduleResult result) {
+        List<ScheduleSlotResponse> slots = result.slots().stream()
+                .map(DOMAIN_TO_RESPONSE_MAPPER_INSTANCE::classScheduleDomainToScheduleSlotResponse)
+                .toList();
+        return SectionScheduleResponse.builder()
+                .sectionId(result.section().getSectionId())
+                .courseId(result.section().getCourseId())
+                .slots(slots)
+                .build();
+    }
+
 
     private boolean isAdmin(Authentication authentication) {
         return authentication != null && authentication.getAuthorities().stream()

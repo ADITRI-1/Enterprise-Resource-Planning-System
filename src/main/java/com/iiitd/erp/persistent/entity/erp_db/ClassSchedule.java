@@ -34,8 +34,12 @@ public class ClassSchedule {
     @Column(name = "end_time", nullable = false)
     private LocalTime endTime;
 
-    @Column(name = "room_id", columnDefinition = "uuid", nullable = false)
-    private UUID roomId;
+    @Column(name = "room_id", nullable = false)
+    private String roomId;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "section_id", insertable = false, updatable = false)
+    private Section section;
 
 }
 

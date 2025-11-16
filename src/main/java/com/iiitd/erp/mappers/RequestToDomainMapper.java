@@ -38,4 +38,7 @@ public interface RequestToDomainMapper {
     SectionDomain sectionCreateRequestToDomain(SectionCreateRequest request);
 
     SectionDomain sectionUpdateRequestToDomain(SectionUpdateRequest request);
+
+    ClassScheduleDomain scheduleSlotRequestToDomain(ScheduleSlotRequest request);
+
 }
