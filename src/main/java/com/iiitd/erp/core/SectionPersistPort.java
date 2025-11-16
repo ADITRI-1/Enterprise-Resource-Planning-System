@@ -10,4 +10,5 @@ public interface SectionPersistPort {
     SectionDomain update(SectionDomain sectionDomain);
     boolean delete(String sectionId);
     List<SectionDomain> findByCourse(String courseId, String semester, Integer year);
+    List<SectionDomain> findByInstructor(String instructorCode, String semester, Integer year);
 }

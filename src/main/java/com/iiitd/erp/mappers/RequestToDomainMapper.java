@@ -41,4 +41,6 @@ public interface RequestToDomainMapper {
 
     ClassScheduleDomain scheduleSlotRequestToDomain(ScheduleSlotRequest request);
 
+    AssessmentComponentDomain assessmentComponentRequestToDomain(AssessmentComponentRequest request);
+
 }

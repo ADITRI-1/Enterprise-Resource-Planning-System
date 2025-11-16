@@ -37,5 +37,6 @@ public interface DomainToEntityMapper {
         return day == null ? null : Weekday.from(day);
     }
 
+    AssessmentComponent assessmentComponentDomainToAssessmentComponent(AssessmentComponentDomain domain);
 
 }

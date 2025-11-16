@@ -13,6 +13,9 @@ public interface SectionRepository extends JpaRepository<Section, String> {
          "s.dayOfWeek, s.startTime, s.endTime, s.room, s.semester, s.year) " +
          "from Section s where s.course.id = :courseId and s.semester = :sem and s.year = :yr")
   List<SectionRow> listByCourse(@Param("courseId") long courseId, @Param("sem") String sem, @Param("yr") int year);
+
     List<Section> findByCourseId(String courseId);
     List<Section> findByCourseIdAndSemesterIgnoreCaseAndYear(String courseId, String semester, Integer year);
+    List<Section> findByInstructorCodeIgnoreCase(String instructorCode);
+    List<Section> findByInstructorCodeIgnoreCaseAndSemesterIgnoreCaseAndYear(String instructorCode, String semester, Integer year);
 }

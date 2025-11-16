@@ -11,6 +11,7 @@ public enum ErrorCode {
     ADMIN_FORBIDDEN("API-001", "User does not have admin privileges"),
     AUTH_NOT_AUTHENTICATED("API-002", "User not authenticated"),
     AUTHENTICATION_FAILED("API-003", "Unable to authenticate user %s"),
+    INSTRUCTOR_FORBIDDEN("API-004", "User does not have instructor privileges"),
     CATALOG_LIST_FAILED("API-010", "Unable to fetch catalog data"),
     CATALOG_SECTIONS_FAILED("API-011", "Unable to fetch sections for course %s"),
     STUDENT_REGISTRATION_BLOCKED("API-020", "Registration blocked because maintenance mode is ON"),
@@ -70,7 +71,13 @@ public enum ErrorCode {
     SCHEDULE_ROOM_CONFLICT("SCH-002", "Room %s is already booked for that slot"),
     SCHEDULE_INSTRUCTOR_CONFLICT("SCH-003", "Instructor %s has another class in that slot"),
     SCHEDULE_ROOM_CAPACITY_MISMATCH("SCH-004", "Room %s capacity %s cannot host section %s (needs %s)"),
-    SCHEDULE_SLOT_INVALID("SCH-005", "Invalid schedule slot definition");
+    SCHEDULE_SLOT_INVALID("SCH-005", "Invalid schedule slot definition"),
+    ASSESSMENT_CREATE_FAILED("ASM-001", "Failed to create assessment %s"),
+    ASSESSMENT_UPDATE_FAILED("ASM-002", "Failed to update assessment %s"),
+    ASSESSMENT_DELETE_FAILED("ASM-003", "Failed to delete assessment %s"),
+    ASSESSMENT_NOT_FOUND("ASM-004", "Assessment component %s not found"),
+    ASSESSMENT_WEIGHT_EXCEEDED("ASM-005", "Assessment weights exceed 100%% for section %s"),
+    SECTION_NOT_OWNED_BY_INSTRUCTOR("ASM-006", "Instructor %s does not own section %s");
 
 
     private final String code;

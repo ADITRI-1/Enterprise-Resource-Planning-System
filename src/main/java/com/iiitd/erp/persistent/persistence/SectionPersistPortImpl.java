@@ -98,4 +98,20 @@ public class SectionPersistPortImpl implements SectionPersistPort {
             throw ErpException.wrap(ErrorCode.SECTION_LIST_FAILED, ex, Map.of("courseId", courseId));
         }
     }
+
+    @Override
+    public List<SectionDomain> findByInstructor(String instructorCode, String semester, Integer year) {
+        LOGGER.debug("Listing sections for instructor {} (semester={}, year={})", instructorCode, semester, year);
+        try {
+            List<Section> rows = (semester != null && year != null)
+                    ? sectionRepository.findByInstructorCodeIgnoreCaseAndSemesterIgnoreCaseAndYear(instructorCode, semester, year)
+                    : sectionRepository.findByInstructorCodeIgnoreCase(instructorCode);
+            return rows.stream()
+                    .map(ENTITY_TO_DOMAIN_MAPPER_INSTANCE::sectionToSectionDomain)
+                    .collect(Collectors.toList());
+        } catch (Exception ex) {
+            LOGGER.error("Failed to list sections for instructor {}", instructorCode, ex);
+            throw ErpException.wrap(ErrorCode.SECTION_LIST_FAILED, ex, Map.of("instructorCode", instructorCode));
+        }
+    }
 }

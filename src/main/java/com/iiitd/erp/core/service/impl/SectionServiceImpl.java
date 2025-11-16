@@ -185,4 +185,23 @@ public class SectionServiceImpl implements SectionService {
                 term.marker());
     }
 
+    @Override
+    public List<SectionDomain> sectionsForInstructor(String instructorCode, String semester, Integer year) {
+        ensureInstructorExists(instructorCode);
+        String normalizedSemester = normalizeSemester(semester);
+        LOGGER.info("Listing sections for instructor {} (semester={}, year={})",
+                instructorCode, normalizedSemester, year);
+        return sections.findByInstructor(instructorCode, normalizedSemester, year);
+    }
+
+    private void ensureInstructorExists(String instructorCode) {
+        if (instructors.findByInstructorCode(instructorCode) == null) {
+            throw ErpException.of(ErrorCode.INSTRUCTOR_NOT_FOUND, Map.of("instructorCode", instructorCode));
+        }
+    }
+
+    private String normalizeSemester(String semester) {
+        return (semester == null || semester.isBlank()) ? null : semester.trim().toUpperCase(Locale.ROOT);
+    }
+
 }

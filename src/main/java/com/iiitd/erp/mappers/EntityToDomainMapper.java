@@ -38,4 +38,6 @@ public interface EntityToDomainMapper {
         return day == null ? null : day.toJava();
     }
 
+    AssessmentComponentDomain assessmentComponentToDomain(AssessmentComponent entity);
+
 }

@@ -29,4 +29,8 @@ public interface DomainToResponseMapper {
 
     ScheduleSlotResponse classScheduleDomainToScheduleSlotResponse(ClassScheduleDomain classScheduleDomain);
 
+    AssessmentComponentResponse assessmentComponentDomainToResponse(AssessmentComponentDomain domain);
+
+    InstructorSectionResponse sectionDomainToInstructorSectionResponse(SectionDomain sectionDomain);
+
 }

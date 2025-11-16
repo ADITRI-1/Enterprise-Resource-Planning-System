@@ -16,8 +16,7 @@ import java.util.UUID;
 @AllArgsConstructor
 @NoArgsConstructor
 @Entity
-@Table(name = "assessment_components", schema = "erp_db",
-        uniqueConstraints = @UniqueConstraint(columnNames = {"section_id","name"}))
+@Table(name = "assessment_components", schema = "erp_db")
 public class AssessmentComponent {
     @Id
     @Column(name = "component_id", columnDefinition = "uuid")
@@ -35,8 +34,10 @@ public class AssessmentComponent {
     @Column(name = "max_score", nullable = false)
     private Integer maxScore;
 
+    @Column(name = "score_out_of", nullable = false)
+    private Integer scoreOutOf;
+
     @Column(name = "due_date")
     private LocalDate dueDate;
 
-    // getters/setters
 }

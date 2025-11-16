@@ -116,7 +116,7 @@ CREATE TABLE erp_db.sections (
 --CREATE INDEX IF NOT EXISTS idx_rooms_capacity ON erp_db.rooms (capacity);
 
 
- DROP TABLE if exists erp_db.class_schedules;
+-- DROP TABLE if exists erp_db.class_schedules;
 
 -- Use ENUM for clean day validation (or skip to VARCHAR version below)
 
@@ -131,12 +131,12 @@ END$$;
 
 CREATE TABLE erp_db.class_schedules (
   schedule_id  UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  section_id   UUID    NOT NULL
+  section_id   VARCHAR(50)    NOT NULL
               REFERENCES erp_db.sections(section_id),
   day_of_week  weekday NOT NULL,
   start_time   TIME    NOT NULL,
   end_time     TIME    NOT NULL,
-  room_id      UUID    NOT NULL
+  room_id     VARCHAR(50)    NOT NULL
               REFERENCES erp_db.rooms(room_id)
               ON UPDATE CASCADE ON DELETE RESTRICT,
   CHECK (end_time > start_time)

@@ -11,4 +11,5 @@ public interface SectionService {
     SectionDomain updateSection(String sectionId, SectionDomain updatedSection);
     boolean deleteSection(String sectionId);
     List<SectionDomain> listSections(String courseId, String semester, Integer year);
+    List<SectionDomain> sectionsForInstructor(String instructorCode, String semester, Integer year);
 }
