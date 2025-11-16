@@ -1,24 +1,29 @@
 package com.iiitd.erp.io.controller;
 
 import com.iiitd.erp.Domain.AssessmentComponentDomain;
+import com.iiitd.erp.Domain.InstructorScoreOverviewDomain;
 import com.iiitd.erp.core.service.AssessmentService;
+import com.iiitd.erp.core.service.ScoreService;
 import com.iiitd.erp.core.service.SectionService;
 import com.iiitd.erp.core.service.TimetableService;
 import com.iiitd.erp.exception.ErrorCode;
 import com.iiitd.erp.exception.ErpException;
 import com.iiitd.erp.io.dto.request.AssessmentComponentRequest;
+import com.iiitd.erp.io.dto.request.UpdateStudentScoresRequest;
 import com.iiitd.erp.io.dto.response.AssessmentComponentResponse;
+import com.iiitd.erp.io.dto.response.InstructorScoreOverviewResponse;
 import com.iiitd.erp.io.dto.response.InstructorSectionResponse;
 import com.iiitd.erp.io.dto.response.InstructorTimetableSlotResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.*;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import jakarta.validation.Valid;
+import org.springframework.web.multipart.MultipartFile;
+
 import java.util.List;
 import java.util.UUID;
 
@@ -36,13 +41,17 @@ public class InstructorController {
     private final AssessmentService assessments;
     private final SectionService sectionService;
     private final TimetableService timetableService;
+    private final ScoreService scoreService;
+
 
     public InstructorController(AssessmentService assessments,
                                 SectionService sectionService,
-                                TimetableService timetableService) {
+                                TimetableService timetableService,
+                                ScoreService scoreService) {
         this.assessments = assessments;
         this.sectionService = sectionService;
         this.timetableService = timetableService;
+        this.scoreService = scoreService;
     }
 
 
@@ -137,7 +146,7 @@ public class InstructorController {
                                           @RequestParam(required = false) Integer year) {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (!isInstructor(auth, instructorCode)) {
-            LOGGER.warn("Unauthorized section list attempt by {}", auth != null ? auth.getName() : "anonymous");
+            LOGGER.warn("Unauthorized section list attempt by {}", auth.getName());
             return error(HttpStatus.FORBIDDEN, ErrorCode.INSTRUCTOR_FORBIDDEN);
         }
         try {
@@ -161,7 +170,7 @@ public class InstructorController {
                                        @RequestParam(required = false) Integer year) {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (!isInstructor(auth, instructorCode)) {
-            LOGGER.warn("Unauthorized timetable request by {}", auth != null ? auth.getName() : "anonymous");
+            LOGGER.warn("Unauthorized timetable request by {}", auth.getName());
             return error(HttpStatus.FORBIDDEN, ErrorCode.INSTRUCTOR_FORBIDDEN);
         }
         try {
@@ -179,6 +188,84 @@ public class InstructorController {
         }
     }
 
+    @GetMapping("/{instructorCode}/sections/{sectionId}/students")
+    public ResponseEntity<?> listStudents(@PathVariable String instructorCode,
+                                          @PathVariable String sectionId) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (!isInstructor(auth, instructorCode)) {
+            LOGGER.warn("Unauthorized student list attempt by {}", auth.getName());
+            return error(HttpStatus.FORBIDDEN, ErrorCode.INSTRUCTOR_FORBIDDEN);
+        }
+        try {
+            InstructorScoreOverviewDomain overview = scoreService.overview(instructorCode, sectionId);
+            return ResponseEntity.ok(toScoreResponse(overview));
+        } catch (ErpException ex) {
+            LOGGER.error("Student list failed for instructor {} section {}", instructorCode, sectionId, ex);
+            return from(ex);
+        }
+    }
+
+    @PutMapping("/{instructorCode}/sections/{sectionId}/scores")
+    public ResponseEntity<?> updateScores(@PathVariable String instructorCode,
+                                          @PathVariable String sectionId,
+                                          @RequestBody @Valid UpdateStudentScoresRequest request) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (!isInstructor(auth, instructorCode)) {
+            LOGGER.warn("Unauthorized score update by {}", auth.getName());
+            return error(HttpStatus.FORBIDDEN, ErrorCode.INSTRUCTOR_FORBIDDEN);
+        }
+        try {
+            InstructorScoreOverviewDomain overview = scoreService.updateScores(
+                    instructorCode, sectionId, request, auth.getName());
+            return ResponseEntity.ok(toScoreResponse(overview));
+        } catch (ErpException ex) {
+            LOGGER.error("Score update failed for instructor {} section {}", instructorCode, sectionId, ex);
+            return from(ex);
+        }
+    }
+
+    @GetMapping("/{instructorCode}/sections/{sectionId}/scores/export")
+    public ResponseEntity<?> exportScores(@PathVariable String instructorCode,
+                                          @PathVariable String sectionId) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (!isInstructor(auth, instructorCode)) {
+            LOGGER.warn("Unauthorized score export by {}", auth.getName());
+            return error(HttpStatus.FORBIDDEN, ErrorCode.INSTRUCTOR_FORBIDDEN);
+        }
+        try {
+            byte[] csv = scoreService.exportCsv(instructorCode, sectionId);
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentDisposition(ContentDisposition.attachment()
+                    .filename("scores-" + sectionId + ".csv").build());
+            headers.setContentType(MediaType.TEXT_PLAIN);
+            return new ResponseEntity<>(csv, headers, HttpStatus.OK);
+        } catch (ErpException ex) {
+            LOGGER.error("Score export failed for instructor {} section {}", instructorCode, sectionId, ex);
+            return from(ex);
+        }
+    }
+
+    @PostMapping(path = "/{instructorCode}/sections/{sectionId}/scores/import",
+            consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<?> importScores(@PathVariable String instructorCode,
+                                          @PathVariable String sectionId,
+                                          @RequestParam("file") MultipartFile file) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (!isInstructor(auth, instructorCode)) {
+            LOGGER.warn("Unauthorized score import by {}", auth.getName());
+            return error(HttpStatus.FORBIDDEN, ErrorCode.INSTRUCTOR_FORBIDDEN);
+        }
+        try {
+            InstructorScoreOverviewDomain overview = scoreService.importCsv(
+                    instructorCode, sectionId, file, auth.getName());
+            return ResponseEntity.ok(toScoreResponse(overview));
+        } catch (ErpException ex) {
+            LOGGER.error("Score import failed for instructor {} section {}", instructorCode, sectionId, ex);
+            return from(ex);
+        }
+    }
+
+
 
     private boolean isInstructor(Authentication auth, String expectedCode) {
         return auth == null
@@ -187,4 +274,39 @@ public class InstructorController {
                 || auth.getAuthorities().stream()
                 .noneMatch(granted -> "INSTRUCTOR".equalsIgnoreCase(granted.getAuthority()));
     }
+
+    private InstructorScoreOverviewResponse toScoreResponse(InstructorScoreOverviewDomain overview) {
+        List<AssessmentComponentResponse> components = overview.getComponents().stream()
+                .map(DOMAIN_TO_RESPONSE_MAPPER_INSTANCE::assessmentComponentDomainToResponse)
+                .toList();
+        List<InstructorScoreOverviewResponse.StudentScoreRow> students = overview.getStudents().stream()
+                .map(student -> InstructorScoreOverviewResponse.StudentScoreRow.builder()
+                        .enrollmentId(student.getEnrollmentId())
+                        .studentId(student.getStudentId())
+                        .studentName(student.getStudentName())
+                        .rollNo(student.getRollNo())
+                        .scores(student.getComponentScores().entrySet().stream()
+                                .map(entry -> InstructorScoreOverviewResponse.StudentComponentScore.builder()
+                                        .componentId(entry.getKey())
+                                        .componentName(overview.getComponents().stream()
+                                                .filter(c -> c.getComponentId().equals(entry.getKey()))
+                                                .findFirst()
+                                                .map(AssessmentComponentDomain::getName)
+                                                .orElse(""))
+                                        .score(entry.getValue())
+                                        .scoreOutOf(overview.getComponents().stream()
+                                                .filter(c -> c.getComponentId().equals(entry.getKey()))
+                                                .findFirst()
+                                                .map(AssessmentComponentDomain::getScoreOutOf)
+                                                .orElse(0))
+                                        .build())
+                                .toList())
+                        .build())
+                .toList();
+        return InstructorScoreOverviewResponse.builder()
+                .components(components)
+                .students(students)
+                .build();
+    }
+
 }

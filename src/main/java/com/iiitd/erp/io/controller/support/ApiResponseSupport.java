@@ -25,7 +25,7 @@ public final class ApiResponseSupport {
     public static HttpStatus resolveStatus(ErrorCode code) {
         return switch (code) {
             case DUPLICATE_STUDENT, SECTION_DUPLICATE, SCHEDULE_ROOM_CONFLICT, SCHEDULE_INSTRUCTOR_CONFLICT -> HttpStatus.CONFLICT;
-            case ADMIN_FORBIDDEN -> HttpStatus.FORBIDDEN;
+            case ADMIN_FORBIDDEN, INSTRUCTOR_FORBIDDEN -> HttpStatus.FORBIDDEN;
             case AUTH_NOT_AUTHENTICATED, AUTHENTICATION_FAILED -> HttpStatus.UNAUTHORIZED;
             case STUDENT_REGISTRATION_BLOCKED,
                  MAINTENANCE_STATUS_FETCH_FAILED,
@@ -33,7 +33,7 @@ public final class ApiResponseSupport {
                  MAINTENANCE_WRITE_BLOCKED -> HttpStatus.SERVICE_UNAVAILABLE;
             case STUDENT_REGISTRATION_FAILED, STUDENT_DROP_FAILED, SECTION_ID_IMMUTABLE,
                  SECTION_INVALID_SEMESTER, SCHEDULE_OUTSIDE_WORKING_HOURS, SCHEDULE_ROOM_CAPACITY_MISMATCH,
-                 SCHEDULE_SLOT_INVALID -> HttpStatus.BAD_REQUEST;
+                 SCHEDULE_SLOT_INVALID, ASSESSMENT_SCORE_INVALID, STUDENT_NOT_IN_SECTION -> HttpStatus.BAD_REQUEST;
             case SECTION_NOT_FOUND -> HttpStatus.NOT_FOUND;
             default -> HttpStatus.INTERNAL_SERVER_ERROR;
         };

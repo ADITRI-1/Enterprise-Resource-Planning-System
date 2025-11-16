@@ -229,6 +229,21 @@ CREATE UNIQUE INDEX uq_assessment_components_section_name
 CREATE INDEX idx_assessment_components_section  ON erp_db.assessment_components (section_id);
 CREATE INDEX idx_assessment_components_due_date ON erp_db.assessment_components (due_date);
 
+CREATE TABLE erp_db.assessment_scores (
+  score_id      UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  enrollment_id UUID NOT NULL
+              REFERENCES erp_db.enrollments(enrollment_id)
+              ON DELETE CASCADE,
+  component_id  UUID NOT NULL
+              REFERENCES erp_db.assessment_components(component_id)
+              ON DELETE CASCADE,
+  score         NUMERIC(7,3) NOT NULL CHECK (score >= 0),
+  updated_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_by    VARCHAR(64) NOT NULL,
+  UNIQUE (enrollment_id, component_id)
+);
+
+
 SET search_path TO som;
 
 INSERT INTO auth_db.user_auth (user_id, username, role, password_hash, status, last_login, password_history)

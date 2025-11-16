@@ -31,9 +31,6 @@ public class AssessmentComponent {
     @Column(precision = 6, scale = 4, nullable = false)
     private BigDecimal weight;  // 0..1
 
-    @Column(name = "max_score", nullable = false)
-    private Integer maxScore;
-
     @Column(name = "score_out_of", nullable = false)
     private Integer scoreOutOf;
 

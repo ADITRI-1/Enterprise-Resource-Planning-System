@@ -77,7 +77,12 @@ public enum ErrorCode {
     ASSESSMENT_DELETE_FAILED("ASM-003", "Failed to delete assessment %s"),
     ASSESSMENT_NOT_FOUND("ASM-004", "Assessment component %s not found"),
     ASSESSMENT_WEIGHT_EXCEEDED("ASM-005", "Assessment weights exceed 100%% for section %s"),
-    SECTION_NOT_OWNED_BY_INSTRUCTOR("ASM-006", "Instructor %s does not own section %s");
+    SECTION_NOT_OWNED_BY_INSTRUCTOR("ASM-006", "Instructor %s does not own section %s"),
+    ASSESSMENT_SCORE_INVALID("ASM-010", "Invalid score submission"),
+    ASSESSMENT_SCORE_IMPORT_FAILED("ASM-011", "Unable to import assessment scores"),
+    ASSESSMENT_SCORE_EXPORT_FAILED("ASM-012", "Unable to export assessment scores"),
+    ENROLLMENT_NOT_FOUND("ASM-013", "Enrollment %s not found"),
+    STUDENT_NOT_IN_SECTION("ASM-014", "Student %s not enrolled in section %s");
 
 
     private final String code;

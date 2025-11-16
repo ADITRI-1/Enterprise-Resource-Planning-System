@@ -39,4 +39,6 @@ public interface DomainToEntityMapper {
 
     AssessmentComponent assessmentComponentDomainToAssessmentComponent(AssessmentComponentDomain domain);
 
+    AssessmentScore assessmentScoreDomainToAssessmentScore(AssessmentScoreDomain domain);
+
 }
