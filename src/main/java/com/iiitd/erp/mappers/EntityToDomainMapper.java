@@ -15,10 +15,16 @@ public interface EntityToDomainMapper {
 
     UserAuthDomain userAuthToDomain(UserAuth userAuth);
 
+    @Mapping(target = "name", source = "studentName")
+    @Mapping(target = "rollNo", expression = "java(parseRoll(student.getRollNo()))")
+    @Mapping(target = "programId", source = "program_id")
+    @Mapping(target = "yearOfRegistration", expression = "java(toYearString(student.getYear()))")
     StudentUserDomain studentToStudentUserDomain(Student student);
 
+    @Mapping(target = "deptId", source = "departmentId")
     InstructorDomain instructorToInstructorDomain(Instructor instructor);
 
+    @Mapping(target = "programType", source = "program_type")
     ProgramDomain programToProgramDomain(Program program);
 
     DepartmentDomain departmentToDepartmentDomain(Department department);
@@ -27,6 +33,7 @@ public interface EntityToDomainMapper {
 
     RoomDomain roomToRoomDomain (Room room);
 
+    @Mapping(target = "active", source = "isActive")
     SectionDomain sectionToSectionDomain(Section section);
 
     @Mapping(target = "dayOfWeek", expression = "java(fromWeekday(classSchedule.getDayOfWeek()))")
@@ -34,12 +41,14 @@ public interface EntityToDomainMapper {
     @Mapping(target = "roomCapacity", ignore = true)
     ClassScheduleDomain classScheduleToClassScheduleDomain(ClassSchedule classSchedule);
 
-    default DayOfWeek fromWeekday(Weekday day) {
-        return day == null ? null : day.toJava();
-    }
-
     AssessmentComponentDomain assessmentComponentToDomain(AssessmentComponent entity);
 
     AssessmentScoreDomain assessmentScoreToDomain(AssessmentScore entity);
 
+    EnrollmentDomain enrollmentToEnrollmentDomain(Enrollment entity);
+
+    // helpers
+    default DayOfWeek fromWeekday(Weekday day) { return day == null ? null : day.toJava(); }
+    default Integer parseRoll(String roll) { return roll == null || roll.isBlank() ? null : Integer.valueOf(roll); }
+    default String toYearString(Integer year) { return year == null ? null : year.toString(); }
 }

@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 import static com.iiitd.erp.mappers.DomainToEntityMapper.DOMAIN_TO_ENTITY_MAPPER_INSTANCE;
@@ -109,6 +110,19 @@ public class StudentPersistPortImpl implements StudentPersistPort {
         } catch (Exception ex) {
             LOGGER.error("Failed to fetch students", ex);
             throw ErpException.wrap(ErrorCode.STUDENT_FETCH_FAILED, ex, Map.of());
+        }
+    }
+
+    @Override
+    public StudentUserDomain findByStudentId(UUID studentId) {
+        LOGGER.debug("Fetching student by id {}", studentId);
+        try {
+            return studentRepository.findById(studentId)
+                    .map(ENTITY_TO_DOMAIN_MAPPER_INSTANCE::studentToStudentUserDomain)
+                    .orElse(null);
+        } catch (Exception ex) {
+            LOGGER.error("Failed to fetch student {}", studentId, ex);
+            throw ErpException.wrap(ErrorCode.STUDENT_FETCH_FAILED, ex, Map.of("studentId", studentId));
         }
     }
 }

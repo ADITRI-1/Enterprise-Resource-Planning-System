@@ -7,5 +7,5 @@ import java.util.List;
 
 public interface CatalogService {
     List<CourseRow> listCourses(String semester, int year, String q);
-    List<SectionRow> listSections(long courseId, String semester, int year);
+    List<SectionRow> listSections(String courseId, String semester, int year);
 }

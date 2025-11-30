@@ -7,7 +7,6 @@ import lombok.extern.jackson.Jacksonized;
 @Builder
 @Jacksonized
 @With
-public record CourseRow(long id,
-                        String code,
+public record CourseRow(String courseId,
                         String title,
                         int credits) {}

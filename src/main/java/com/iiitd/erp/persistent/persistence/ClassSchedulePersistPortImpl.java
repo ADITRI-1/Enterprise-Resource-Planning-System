@@ -79,4 +79,16 @@ public class ClassSchedulePersistPortImpl implements ClassSchedulePersistPort {
             throw ErpException.wrap(ErrorCode.SECTION_DELETE_FAILED, ex, Map.of("sectionId", sectionId));
         }
     }
+
+    @Override
+    public List<ClassScheduleDomain> findBySectionIds(List<String> sectionIds) {
+        try {
+            return repository.findBySectionIdInOrderByDayOfWeekAscStartTimeAsc(sectionIds).stream()
+                    .map(ENTITY_TO_DOMAIN_MAPPER_INSTANCE::classScheduleToClassScheduleDomain)
+                    .toList();
+        } catch (Exception ex) {
+            LOGGER.error("Failed to fetch schedules for sections {}", sectionIds, ex);
+            throw ErpException.wrap(ErrorCode.SECTION_FETCH_FAILED, ex, Map.of("sectionIds", sectionIds));
+        }
+    }
 }

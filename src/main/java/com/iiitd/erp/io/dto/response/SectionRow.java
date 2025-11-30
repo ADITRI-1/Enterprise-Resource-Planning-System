@@ -1,12 +1,18 @@
 package com.iiitd.erp.io.dto.response;
-public record SectionRow(long id,
-                         long courseId,
-                         String instructor,
+
+import lombok.Builder;
+import lombok.With;
+import lombok.extern.jackson.Jacksonized;
+
+@Builder
+@Jacksonized
+@With
+public record SectionRow(String sectionId,
+                         String courseId,
+                         String instructorCode,
+                         String instructorName,
                          int capacity,
                          int enrolled,
-//                         int dayOfWeek,
-//                         String startTime,
-//                         String endTime,
-//                         String room,
+                         int available,
                          String semester,
                          int year) {}

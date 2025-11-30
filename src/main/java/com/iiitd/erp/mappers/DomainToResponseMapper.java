@@ -3,6 +3,7 @@ package com.iiitd.erp.mappers;
 import com.iiitd.erp.Domain.*;
 import com.iiitd.erp.io.dto.response.*;
 import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
 import org.mapstruct.factory.Mappers;
 
 @Mapper
@@ -15,6 +16,7 @@ public interface DomainToResponseMapper {
 
     StudentResponse studentDomainToResponse(StudentUserDomain studentUserDomain);
 
+    @Mapping(target = "department", source = "deptId")
     InstructorResponse instructorDomainToResponse(InstructorDomain instructorDomain);
 
     ProgramResponse programDomainToResponse(ProgramDomain programDomain);
@@ -25,6 +27,8 @@ public interface DomainToResponseMapper {
 
     RoomResponse roomDomainToResponse(RoomDomain roomDomain);
 
+    @Mapping(target = "year", expression = "java(sectionDomain.getYear() == null ? 0 : sectionDomain.getYear())")
+    @Mapping(target = "active", expression = "java(Boolean.TRUE.equals(sectionDomain.getActive()))")
     SectionResponse sectionDomainToResponse(SectionDomain sectionDomain);
 
     ScheduleSlotResponse classScheduleDomainToScheduleSlotResponse(ClassScheduleDomain classScheduleDomain);
@@ -33,6 +37,12 @@ public interface DomainToResponseMapper {
 
     InstructorSectionResponse sectionDomainToInstructorSectionResponse(SectionDomain sectionDomain);
 
+    @Mapping(target = "year", expression = "java(domain.getYear() == null ? 0 : domain.getYear())")
     InstructorTimetableSlotResponse instructorTimetableSlotDomainToResponse(InstructorTimetableSlotDomain domain);
 
+    RegistrationResult registrationOutcomeToResponse(RegistrationOutcomeDomain domain);
+
+    TimetableSlot studentTimetableSlotToResponse(StudentTimetableSlotDomain domain);
+
+    GradeRow studentGradeDomainToResponse(StudentGradeDomain domain);
 }

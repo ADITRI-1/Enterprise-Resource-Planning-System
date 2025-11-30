@@ -7,5 +7,4 @@ import lombok.extern.jackson.Jacksonized;
 @Builder
 @Jacksonized
 @With
-
-public record DropRequest(long sectionId) {}
+public record DropRequest(String sectionId) {}

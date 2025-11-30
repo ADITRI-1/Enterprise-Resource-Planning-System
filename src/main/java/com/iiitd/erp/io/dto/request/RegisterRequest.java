@@ -7,6 +7,4 @@ import lombok.extern.jackson.Jacksonized;
 @Builder
 @Jacksonized
 @With
-
-public record RegisterRequest(long sectionId) {}
-
+public record RegisterRequest(String sectionId) {}
