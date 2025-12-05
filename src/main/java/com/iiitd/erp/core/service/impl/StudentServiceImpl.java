@@ -41,7 +41,7 @@ public class StudentServiceImpl implements StudentService {
 
     @Override
     public CreateUserDomain createStudentUser(StudentUserDomain studentDomain) {
-        Integer rollNo = studentDomain.getRollNo();
+        String rollNo = studentDomain.getRollNo();
         LOGGER.info("Attempting to create student user for roll {}", rollNo);
 
         if (studentPersistPort.findByRollNo(rollNo) != null) {
@@ -84,7 +84,7 @@ public class StudentServiceImpl implements StudentService {
 
     @Override
     public StudentUserDomain updateStudentUser(StudentUserDomain studentDomain) {
-        Integer rollNo = studentDomain.getRollNo();
+        String rollNo = studentDomain.getRollNo();
         LOGGER.info("Updating student user for roll {}", rollNo);
 
         if (studentPersistPort.findByRollNo(rollNo) == null) {
@@ -107,7 +107,7 @@ public class StudentServiceImpl implements StudentService {
     }
 
     @Override
-    public boolean deleteStudentUser(Integer rollNo) {
+    public boolean deleteStudentUser(String rollNo) {
         LOGGER.info("Deleting student user for roll {}", rollNo);
 
         if (studentPersistPort.findByRollNo(rollNo) == null) {

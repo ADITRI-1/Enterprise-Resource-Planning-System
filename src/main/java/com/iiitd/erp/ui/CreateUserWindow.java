@@ -1,3 +1,5 @@
+package com.iiitd.erp.ui;
+
 import javax.swing.*;
 import java.awt.*;
 import javax.swing.border.EmptyBorder;
@@ -85,7 +87,7 @@ public class CreateUserWindow extends JFrame {
 
         // ✅ ACTION LISTENERS FOR NAVIGATION
         studentBtn.addActionListener(e -> {
-            new StudentAccountWindow().setVisible(true);
+//            new StudentAccountWindow().setVisible(true);
             dispose(); // close current window
         });
 

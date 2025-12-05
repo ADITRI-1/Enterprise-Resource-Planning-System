@@ -1,5 +1,6 @@
 package com.iiitd.erp.persistent.persistence.repository;
 
+import com.iiitd.erp.Domain.StudentGradeDomain;
 import com.iiitd.erp.io.dto.response.GradeRow;
 import com.iiitd.erp.persistent.entity.erp_db.Grade;
 import org.springframework.data.jpa.repository.Query;
@@ -26,5 +27,5 @@ public interface GradeRepository extends Repository<Grade, UUID> {
            where e.studentId = :studentId
              and lower(e.status) in ('enrolled','completed')
            """)
-    List<GradeRow> findByStudent(@Param("studentId") UUID studentId);
+    List<StudentGradeDomain> findByStudent(@Param("studentId") UUID studentId);
 }

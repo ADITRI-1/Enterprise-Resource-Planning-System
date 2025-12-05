@@ -38,7 +38,7 @@ public class AuthController {
         LOGGER.info("Login attempt for {}", username);
         try {
             AuthResultDomain result = authSessionService.loginAndCreateSession(username, loginRequest.getPassword(), request);
-            LoginResponse response = DOMAIN_TO_RESPONSE_MAPPER_INSTANCE.domainToLoginResponse(result);
+            LoginResponse response = DOMAIN_TO_RESPONSE_MAPPER_INSTANCE.domainToLoginResponse(result).withMessage("Login Successful");
             return ResponseEntity.ok(response);
         } catch (ErpException ex) {
             LOGGER.warn("Login failed for {}: {}", username, ex.getErrorCode().getCode(), ex);

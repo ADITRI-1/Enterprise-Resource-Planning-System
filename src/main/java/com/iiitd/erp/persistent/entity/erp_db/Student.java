@@ -33,7 +33,7 @@ public class Student {
     private String dateOfBirth;
 
     @Column(name = "program_id", nullable = false, length = 120)
-    private String program_id;
+    private String programId;
 
     @Column(name = "year", nullable = false)
     private Integer year;

@@ -17,7 +17,7 @@ public interface DomainToEntityMapper {
 
     @Mapping(target = "studentName", source = "name")
     @Mapping(target = "rollNo", expression = "java(toString(studentUserDomain.getRollNo()))")
-    @Mapping(target = "program_id", source = "programId")
+    @Mapping(target = "programId", source = "programId")
     @Mapping(target = "year", expression = "java(parseYear(studentUserDomain.getYearOfRegistration()))")
     Student studentUserDomainToStudent(StudentUserDomain studentUserDomain);
 

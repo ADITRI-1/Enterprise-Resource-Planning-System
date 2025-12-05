@@ -6,10 +6,10 @@ import java.util.List;
 import java.util.UUID;
 
 public interface StudentPersistPort {
-    StudentUserDomain findByRollNo(Integer rollNo);
+    StudentUserDomain findByRollNo(String rollNo);
     StudentUserDomain findByStudentId(UUID studentId);
     boolean saveStudent(StudentUserDomain studentDomain);
     StudentUserDomain updateStudent(StudentUserDomain studentDomain);
-    boolean deleteStudent(Integer rollNo);
+    boolean deleteStudent(String rollNo);
     List<StudentUserDomain> findAll();
 }

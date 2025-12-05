@@ -116,7 +116,7 @@ public class AdminController {
     }
 
     @PutMapping("/student/{rollNo}")
-    public ResponseEntity<?> updateStudentUser(@PathVariable Integer rollNo,
+    public ResponseEntity<?> updateStudentUser(@PathVariable String rollNo,
                                                @RequestBody StudentUpdateRequest request) {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (!isAdmin(auth)) {
@@ -141,7 +141,7 @@ public class AdminController {
     }
 
     @DeleteMapping("/student/{rollNo}")
-    public ResponseEntity<?> deleteStudentUser(@PathVariable Integer rollNo) {
+    public ResponseEntity<?> deleteStudentUser(@PathVariable String rollNo) {
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (!isAdmin(auth)) {
             LOGGER.warn("Unauthorized attempt to delete student by {}", auth != null ? auth.getName() : "anonymous");

@@ -7,13 +7,7 @@ import com.iiitd.erp.core.service.support.SemesterTerm;
 import com.iiitd.erp.exception.ErrorCode;
 import com.iiitd.erp.exception.ErpException;
 import com.iiitd.erp.io.dto.response.GradeRow;
-import com.iiitd.erp.io.dto.response.RegistrationResult;
-import com.iiitd.erp.io.dto.response.TimetableSlot;
-import com.iiitd.erp.persistent.entity.erp_db.AssessmentScore;
-import com.iiitd.erp.persistent.entity.erp_db.ClassSchedule;
-import com.iiitd.erp.persistent.entity.erp_db.Enrollment;
-import com.iiitd.erp.persistent.entity.erp_db.Room;
-import com.iiitd.erp.persistent.persistence.repository.*;
+import com.iiitd.erp.persistent.persistence.repository.GradeRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -82,6 +76,7 @@ public class SectionServiceImpl implements SectionService {
                 .sectionId(sectionId)
                 .courseId(course.getCourseId())
                 .instructorId(instructor.getInstructorId())
+                .instructorCode(instructor.getInstructorCode())
                 .semester(term.label())
                 .year(sectionDomain.getYear())
                 .capacity(sectionDomain.getCapacity())
@@ -120,6 +115,7 @@ public class SectionServiceImpl implements SectionService {
 
         SectionDomain payload = existing
                 .withInstructorId(instructor.getInstructorId())
+                .withInstructorCode(instructor.getInstructorCode())
                 .withSemester(term.label())
                 .withYear(sectionDomain.getYear())
                 .withCapacity(sectionDomain.getCapacity())
@@ -127,8 +123,7 @@ public class SectionServiceImpl implements SectionService {
                 .withRegistrationDeadline(sectionDomain.getRegistrationDeadline());
 
         try {
-            SectionDomain saved = sections.update(payload);
-            return saved.withInstructorCode(instructor.getInstructorCode());
+            return sections.update(payload).withInstructorCode(instructor.getInstructorCode());
         } catch (ErpException ex) {
             LOGGER.error("Known failure updating section {}: {}", sectionId, ex.getErrorCode().getCode(), ex);
             throw ex;
@@ -169,7 +164,6 @@ public class SectionServiceImpl implements SectionService {
             throw ErpException.wrap(ErrorCode.SECTION_LIST_FAILED, ex, Map.of("courseId", courseId));
         }
     }
-
 
     // ---------------- Student-facing operations ----------------
 
@@ -215,7 +209,7 @@ public class SectionServiceImpl implements SectionService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<StudentTimetableSlotDomain> timetableForStudent(String studentUserId, String semester, int year) {
+    public List<StudentTimeTableSlotDomain> timetableForStudent(String studentUserId, String semester, int year) {
         UUID studentId = requireStudent(studentUserId);
         String normalizedSemester = normalizeSemester(semester);
 
@@ -241,8 +235,8 @@ public class SectionServiceImpl implements SectionService {
 
         return slots.stream()
                 .map(cs -> toStudentTimetableSlot(cs, sectionMap.get(cs.getSectionId()), courseCache, roomCache))
-                .sorted(Comparator.comparingInt(StudentTimetableSlotDomain::getDayOfWeek)
-                        .thenComparing(StudentTimetableSlotDomain::getStartTime))
+                .sorted(Comparator.comparingInt(StudentTimeTableSlotDomain::getDayOfWeek)
+                        .thenComparing(StudentTimeTableSlotDomain::getStartTime))
                 .toList();
     }
 
@@ -251,15 +245,7 @@ public class SectionServiceImpl implements SectionService {
     public List<StudentGradeDomain> gradesForStudent(String studentUserId) {
         UUID studentId = requireStudent(studentUserId);
         try {
-            List<StudentGradeDomain> rows = grades.findByStudent(studentId).stream()
-                    .map(g -> StudentGradeDomain.builder()
-                            .courseCode(g.courseCode())
-                            .courseTitle(g.courseTitle())
-                            .component(g.component())
-                            .score(g.score())
-                            .finalGrade(g.finalGrade())
-                            .build())
-                    .toList();
+            List<StudentGradeDomain> rows = grades.findByStudent(studentId).stream().toList();
             if (rows.isEmpty()) {
                 return buildGradesFromAssessments(studentId);
             }
@@ -292,12 +278,15 @@ public class SectionServiceImpl implements SectionService {
         }
     }
 
+    // ---------------- helpers ----------------
 
     private UUID requireStudent(String userId) {
         try {
             UUID uid = UUID.fromString(userId);
-            students.findById(uid).orElseThrow(() ->
-                    ErpException.of(ErrorCode.STUDENT_NOT_FOUND, Map.of("studentId", userId)));
+            StudentUserDomain student = students.findByStudentId(uid);
+            if (student == null) {
+                throw ErpException.of(ErrorCode.STUDENT_NOT_FOUND, Map.of("studentId", userId));
+            }
             return uid;
         } catch (IllegalArgumentException ex) {
             throw ErpException.of(ErrorCode.STUDENT_NOT_FOUND, Map.of("studentId", userId));
@@ -332,7 +321,7 @@ public class SectionServiceImpl implements SectionService {
     }
 
     private void ensureNotDuplicate(UUID studentId, String sectionId) {
-        enrollments.findByStudentIdAndSectionId(studentId, sectionId)
+        enrollments.findByStudentAndSection(studentId, sectionId)
                 .filter(e -> "ENROLLED".equalsIgnoreCase(e.getStatus()))
                 .ifPresent(e -> {
                     throw ErpException.of(ErrorCode.DUPLICATE_STUDENT,
@@ -342,7 +331,7 @@ public class SectionServiceImpl implements SectionService {
 
     private void ensureCapacity(String sectionId, Integer capacity) {
         int cap = capacity == null ? 0 : capacity;
-        long enrolled = enrollments.countBySectionIdAndStatusIgnoreCase(sectionId, "ENROLLED");
+        long enrolled = enrollments.countEnrolled(sectionId);
         if (enrolled >= cap) {
             throw ErpException.of(ErrorCode.STUDENT_REGISTRATION_FAILED,
                     Map.of("sectionId", sectionId, "reason", "Section full"));
@@ -356,32 +345,13 @@ public class SectionServiceImpl implements SectionService {
         sections.update(section.withEnrollmentCount(updated));
     }
 
-    private TimetableSlot toTimetableSlot(ClassSchedule cs,
-                                          SectionDomain section,
-                                          Map<String, CourseDomain> courseCache,
-                                          Map<String, Room> roomCache) {
-        CourseDomain course = courseCache.computeIfAbsent(section.getCourseId(), courses::findByCourseId);
-        Room room = roomCache.computeIfAbsent(cs.getRoomId(), id -> rooms.findById(id).orElse(null));
-        String courseCode = course != null ? course.getCourseId() : section.getCourseId();
-        String courseTitle = course != null ? course.getTitle() : null;
-        String roomNumber = room != null ? room.getRoomNumber() : cs.getRoomId();
-        return new TimetableSlot(
-                cs.getDayOfWeek().toJava().getValue(),
-                cs.getStartTime().toString(),
-                cs.getEndTime().toString(),
-                courseCode,
-                courseTitle,
-                roomNumber
-        );
-    }
-
-    private List<GradeRow> buildGradesFromAssessments(UUID studentId) {
-        List<Enrollment> completed = enrollments.findByStudentIdAndStatusIn(studentId, List.of("ENROLLED", "COMPLETED"));
+    private List<StudentGradeDomain> buildGradesFromAssessments(UUID studentId) {
+        List<EnrollmentDomain> completed = enrollments.findByStudentAndStatuses(studentId, List.of("ENROLLED", "COMPLETED"));
         if (completed.isEmpty()) {
             return List.of();
         }
-        List<GradeRow> rows = new ArrayList<>();
-        for (Enrollment enrollment : completed) {
+        List<StudentGradeDomain> rows = new ArrayList<>();
+        for (EnrollmentDomain enrollment : completed) {
             SectionDomain section = sections.findBySectionId(enrollment.getSectionId());
             if (section == null) continue;
             CourseDomain course = courses.findByCourseId(section.getCourseId());
@@ -391,22 +361,41 @@ public class SectionServiceImpl implements SectionService {
             Map<UUID, AssessmentComponentDomain> componentMap = components.listBySection(section.getSectionId()).stream()
                     .collect(Collectors.toMap(AssessmentComponentDomain::getComponentId, c -> c));
 
-            List<AssessmentScore> componentScores = scores.findBySection(section.getSectionId()).stream()
+            List<AssessmentScoreDomain> componentScores = scores.findBySection(section.getSectionId()).stream()
                     .filter(sc -> sc.getEnrollmentId().equals(enrollment.getEnrollmentId()))
                     .toList();
 
-            for (AssessmentScore score : componentScores) {
+            for (AssessmentScoreDomain score : componentScores) {
                 AssessmentComponentDomain comp = componentMap.get(score.getComponentId());
-                rows.add(GradeRow.builder()
+                rows.add(StudentGradeDomain.builder()
                         .courseCode(courseCode)
                         .courseTitle(courseTitle)
                         .component(comp != null ? comp.getName() : "Component")
-                        .score(score.getScore().doubleValue())
+                        .score(score.getScore())
                         .finalGrade(null)
                         .build());
             }
         }
         return rows;
+    }
+
+    private StudentTimeTableSlotDomain toStudentTimetableSlot(ClassScheduleDomain cs,
+                                                              SectionDomain section,
+                                                              Map<String, CourseDomain> courseCache,
+                                                              Map<String, RoomDomain> roomCache) {
+        CourseDomain course = courseCache.computeIfAbsent(section.getCourseId(), courses::findByCourseId);
+        RoomDomain room = roomCache.computeIfAbsent(cs.getRoomId(), rooms::findByRoomId);
+        String courseCode = course != null ? course.getCourseId() : section.getCourseId();
+        String courseTitle = course != null ? course.getTitle() : null;
+        String roomNumber = room != null ? room.getRoomNumber() : cs.getRoomId();
+        return StudentTimeTableSlotDomain.builder()
+                .dayOfWeek(cs.getDayOfWeek().getValue())
+                .startTime(cs.getStartTime())
+                .endTime(cs.getEndTime())
+                .courseCode(courseCode)
+                .courseTitle(courseTitle)
+                .room(roomNumber)
+                .build();
     }
 
     private String normalizeSemester(String semester) {
@@ -416,8 +405,6 @@ public class SectionServiceImpl implements SectionService {
     private String escape(String value) {
         return value == null ? "" : value.replace("\"", "\"\"");
     }
-
-
 
     private CourseDomain ensureCourse(String courseId) {
         CourseDomain course = courses.findByCourseId(courseId);
@@ -452,7 +439,6 @@ public class SectionServiceImpl implements SectionService {
         }
     }
 
-
     private String buildSectionId(String courseId, String instructorCode, int year, SemesterTerm term) {
         String yearSuffix = String.format("%02d", Math.floorMod(year, 100));
         return "%s-%s-%s-%s".formatted(
@@ -476,25 +462,4 @@ public class SectionServiceImpl implements SectionService {
             throw ErpException.of(ErrorCode.INSTRUCTOR_NOT_FOUND, Map.of("instructorCode", instructorCode));
         }
     }
-
-
-    private StudentTimetableSlotDomain toStudentTimetableSlot(ClassScheduleDomain cs,
-                                                              SectionDomain section,
-                                                              Map<String, CourseDomain> courseCache,
-                                                              Map<String, RoomDomain> roomCache) {
-        CourseDomain course = courseCache.computeIfAbsent(section.getCourseId(), courses::findByCourseId);
-        RoomDomain room = roomCache.computeIfAbsent(cs.getRoomId(), rooms::findByRoomId);
-        String courseCode = course != null ? course.getCourseId() : section.getCourseId();
-        String courseTitle = course != null ? course.getTitle() : null;
-        String roomNumber = room != null ? room.getRoomNumber() : cs.getRoomId();
-        return StudentTimetableSlotDomain.builder()
-                .dayOfWeek(cs.getDayOfWeek().getValue())
-                .startTime(cs.getStartTime())
-                .endTime(cs.getEndTime())
-                .courseCode(courseCode)
-                .courseTitle(courseTitle)
-                .room(roomNumber)
-                .build();
-    }
-
 }

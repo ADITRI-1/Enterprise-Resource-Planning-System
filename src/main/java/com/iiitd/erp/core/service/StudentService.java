@@ -8,6 +8,6 @@ import java.util.List;
 public interface StudentService {
     CreateUserDomain createStudentUser(StudentUserDomain student);
     StudentUserDomain updateStudentUser(StudentUserDomain student);
-    boolean deleteStudentUser(Integer rollNo);
+    boolean deleteStudentUser(String rollNo);
     List<StudentUserDomain> listStudents();
 }

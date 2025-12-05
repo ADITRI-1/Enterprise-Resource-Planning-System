@@ -49,7 +49,7 @@ public class CatalogController {
     }
 
     @GetMapping("/{courseId}/sections")
-    public ResponseEntity<?> sections(@PathVariable long courseId,
+    public ResponseEntity<?> sections(@PathVariable String courseId,
                                       @RequestParam String semester,
                                       @RequestParam int year){
         try {

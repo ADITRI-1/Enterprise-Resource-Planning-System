@@ -17,8 +17,8 @@ public interface SectionRepository extends JpaRepository<Section, String> {
                s.instructorCode,
                null,
                coalesce(s.capacity, 0),
-               coalesce(sum(case when lower(e.status) = 'enrolled' then 1 else 0 end), 0),
-               coalesce(s.capacity, 0) - coalesce(sum(case when lower(e.status) = 'enrolled' then 1 else 0 end), 0),
+               cast(coalesce(sum(case when lower(e.status) = 'enrolled' then 1 else 0 end), 0) as integer),
+               cast(coalesce(s.capacity, 0) - coalesce(sum(case when lower(e.status) = 'enrolled' then 1 else 0 end), 0) as integer),
                s.semester,
                s.year
            )

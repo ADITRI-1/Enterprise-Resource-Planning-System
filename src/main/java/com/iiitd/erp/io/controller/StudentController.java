@@ -2,8 +2,7 @@ package com.iiitd.erp.io.controller;
 
 import com.iiitd.erp.Domain.RegistrationOutcomeDomain;
 import com.iiitd.erp.Domain.StudentGradeDomain;
-import com.iiitd.erp.Domain.StudentTimetableSlotDomain;
-import com.iiitd.erp.core.service.AccessService;
+import com.iiitd.erp.Domain.StudentTimeTableSlotDomain;
 import com.iiitd.erp.core.service.CatalogService;
 import com.iiitd.erp.core.service.MaintenanceService;
 import com.iiitd.erp.core.service.SectionService;
@@ -21,6 +20,8 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.nio.file.Path;
@@ -37,27 +38,28 @@ public class StudentController {
     private static final Logger LOGGER = LoggerFactory.getLogger(StudentController.class);
 
     private final SectionService sections;
-    private final AccessService access;
     private final MaintenanceService maintenance;
     private final CatalogService catalog;
     private final DomainToResponseMapper mapper = DomainToResponseMapper.DOMAIN_TO_RESPONSE_MAPPER_INSTANCE;
 
     public StudentController(SectionService sections,
-                             AccessService access,
                              MaintenanceService maintenance,
-                             CatalogService catalog){
+                             CatalogService catalog) {
         this.sections = sections;
-        this.access = access;
         this.maintenance = maintenance;
         this.catalog = catalog;
     }
 
-    // Catalog endpoints unchanged (use response DTOs)
+    // Catalog endpoints can be added here as before if needed.
 
     @PostMapping("/{uid}/register")
-    public ResponseEntity<?> register(@PathVariable String uid, @RequestBody RegisterRequest request){
+    public ResponseEntity<?> register(@PathVariable String uid, @RequestBody RegisterRequest request) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (isStudentUnauthorized(auth, uid)) {
+            LOGGER.warn("Unauthorized registration attempt by {}", auth != null ? auth.getName() : "anonymous");
+            return error(HttpStatus.FORBIDDEN, ErrorCode.AUTH_NOT_AUTHENTICATED);
+        }
         try {
-            access.ensureStudent(uid);
             if (maintenance.isReadOnly()) {
                 LOGGER.warn("Registration blocked for {} due to maintenance mode", uid);
                 return error(HttpStatus.SERVICE_UNAVAILABLE, ErrorCode.STUDENT_REGISTRATION_BLOCKED);
@@ -67,6 +69,7 @@ public class StudentController {
         } catch (ErpException ex) {
             return from(ex);
         } catch (Exception ex) {
+            LOGGER.error("Unexpected registration failure for {} section {}", uid, request.sectionId(), ex);
             return error(HttpStatus.BAD_REQUEST,
                     ErrorCode.STUDENT_REGISTRATION_FAILED,
                     ErrorCode.STUDENT_REGISTRATION_FAILED.format(uid, request.sectionId()));
@@ -74,9 +77,13 @@ public class StudentController {
     }
 
     @PostMapping("/{uid}/drop")
-    public ResponseEntity<?> drop(@PathVariable String uid, @RequestBody DropRequest request){
+    public ResponseEntity<?> drop(@PathVariable String uid, @RequestBody DropRequest request) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (isStudentUnauthorized(auth, uid)) {
+            LOGGER.warn("Unauthorized drop attempt by {}", auth != null ? auth.getName() : "anonymous");
+            return error(HttpStatus.FORBIDDEN, ErrorCode.AUTH_NOT_AUTHENTICATED);
+        }
         try {
-            access.ensureStudent(uid);
             if (maintenance.isReadOnly()) {
                 return error(HttpStatus.SERVICE_UNAVAILABLE, ErrorCode.STUDENT_REGISTRATION_BLOCKED);
             }
@@ -85,6 +92,7 @@ public class StudentController {
         } catch (ErpException ex) {
             return from(ex);
         } catch (Exception ex) {
+            LOGGER.error("Unexpected drop failure for {} section {}", uid, request.sectionId(), ex);
             return error(HttpStatus.BAD_REQUEST,
                     ErrorCode.STUDENT_DROP_FAILED,
                     ErrorCode.STUDENT_DROP_FAILED.format(uid, request.sectionId()));
@@ -94,17 +102,22 @@ public class StudentController {
     @GetMapping("/{uid}/timetable")
     public ResponseEntity<?> timetable(@PathVariable String uid,
                                        @RequestParam String semester,
-                                       @RequestParam int year){
+                                       @RequestParam int year) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (isStudentUnauthorized(auth, uid)) {
+            LOGGER.warn("Unauthorized timetable request by {}", auth != null ? auth.getName() : "anonymous");
+            return error(HttpStatus.FORBIDDEN, ErrorCode.AUTH_NOT_AUTHENTICATED);
+        }
         try {
-            access.ensureStudent(uid);
-            List<StudentTimetableSlotDomain> slots = sections.timetableForStudent(uid, semester, year);
+            List<StudentTimeTableSlotDomain> slots = sections.timetableForStudent(uid, semester, year);
             List<TimetableSlot> response = slots.stream()
-                    .map(mapper::studentTimetableSlotToResponse)
+                    .map(mapper::studentTimeTableSlotToResponse)
                     .toList();
             return ResponseEntity.ok(response);
         } catch (ErpException ex) {
             return from(ex);
         } catch (Exception ex) {
+            LOGGER.error("Unexpected timetable failure for {}", uid, ex);
             return error(HttpStatus.INTERNAL_SERVER_ERROR,
                     ErrorCode.STUDENT_TIMETABLE_FAILED,
                     ErrorCode.STUDENT_TIMETABLE_FAILED.format(uid));
@@ -112,9 +125,13 @@ public class StudentController {
     }
 
     @GetMapping("/{uid}/grades")
-    public ResponseEntity<?> grades(@PathVariable String uid){
+    public ResponseEntity<?> grades(@PathVariable String uid) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (isStudentUnauthorized(auth, uid)) {
+            LOGGER.warn("Unauthorized grades request by {}", auth != null ? auth.getName() : "anonymous");
+            return error(HttpStatus.FORBIDDEN, ErrorCode.AUTH_NOT_AUTHENTICATED);
+        }
         try {
-            access.ensureStudent(uid);
             List<StudentGradeDomain> grades = sections.gradesForStudent(uid);
             List<GradeRow> response = grades.stream()
                     .map(mapper::studentGradeDomainToResponse)
@@ -123,6 +140,7 @@ public class StudentController {
         } catch (ErpException ex) {
             return from(ex);
         } catch (Exception ex) {
+            LOGGER.error("Unexpected grades failure for {}", uid, ex);
             return error(HttpStatus.INTERNAL_SERVER_ERROR,
                     ErrorCode.STUDENT_GRADES_FAILED,
                     ErrorCode.STUDENT_GRADES_FAILED.format(uid));
@@ -130,14 +148,19 @@ public class StudentController {
     }
 
     @GetMapping(value = "/{uid}/transcript.csv", produces = MediaType.TEXT_PLAIN_VALUE)
-    public ResponseEntity<?> transcriptPath(@PathVariable String uid){
+    public ResponseEntity<?> transcriptPath(@PathVariable String uid) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (isStudentUnauthorized(auth, uid)) {
+            LOGGER.warn("Unauthorized transcript path request by {}", auth != null ? auth.getName() : "anonymous");
+            return error(HttpStatus.FORBIDDEN, ErrorCode.AUTH_NOT_AUTHENTICATED);
+        }
         try {
-            access.ensureStudent(uid);
             Path path = sections.exportTranscript(uid);
             return ResponseEntity.ok(path.toString());
         } catch (ErpException ex) {
             return from(ex);
         } catch (Exception ex) {
+            LOGGER.error("Unexpected transcript export failure for {}", uid, ex);
             return error(HttpStatus.INTERNAL_SERVER_ERROR,
                     ErrorCode.STUDENT_TRANSCRIPT_FAILED,
                     ErrorCode.STUDENT_TRANSCRIPT_FAILED.format(uid));
@@ -145,9 +168,13 @@ public class StudentController {
     }
 
     @GetMapping("/{uid}/transcript/download")
-    public ResponseEntity<?> transcriptDownload(@PathVariable String uid){
+    public ResponseEntity<?> transcriptDownload(@PathVariable String uid) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (isStudentUnauthorized(auth, uid)) {
+            LOGGER.warn("Unauthorized transcript download by {}", auth != null ? auth.getName() : "anonymous");
+            return error(HttpStatus.FORBIDDEN, ErrorCode.AUTH_NOT_AUTHENTICATED);
+        }
         try {
-            access.ensureStudent(uid);
             Path path = sections.exportTranscript(uid);
             FileSystemResource resource = new FileSystemResource(path);
             if (!resource.exists()) {
@@ -162,9 +189,18 @@ public class StudentController {
         } catch (ErpException ex) {
             return from(ex);
         } catch (Exception ex) {
+            LOGGER.error("Unexpected transcript download failure for {}", uid, ex);
             return error(HttpStatus.INTERNAL_SERVER_ERROR,
                     ErrorCode.STUDENT_TRANSCRIPT_FAILED,
                     ErrorCode.STUDENT_TRANSCRIPT_FAILED.format(uid));
         }
+    }
+
+    private boolean isStudentUnauthorized(Authentication auth, String expectedUid) {
+        return auth == null
+                || !auth.isAuthenticated()
+                || !expectedUid.equalsIgnoreCase(auth.getName())
+                || auth.getAuthorities().stream()
+                .noneMatch(granted -> "STUDENT".equalsIgnoreCase(granted.getAuthority()));
     }
 }

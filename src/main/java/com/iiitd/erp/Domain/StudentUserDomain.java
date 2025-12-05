@@ -9,7 +9,7 @@ import lombok.With;
 @With
 public class StudentUserDomain {
     private String name;
-    private Integer rollNo;
+    private String rollNo;
     private String dateOfBirth;
     private String programId;
     private String yearOfRegistration;

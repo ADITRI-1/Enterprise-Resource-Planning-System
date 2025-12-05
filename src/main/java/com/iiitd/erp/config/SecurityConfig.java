@@ -1,7 +1,7 @@
 package com.iiitd.erp.config;
 
 import com.iiitd.erp.persistent.entity.auth_db.UserAuth;
-import com.iiitd.erp.persistent.persistence.repository.UsersAuthRepository;
+import com.iiitd.erp.persistent.persistence.repository.UserAuthRepository;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -26,7 +26,7 @@ public class SecurityConfig {
   PasswordEncoder passwordEncoder(){ return new BCryptPasswordEncoder(12); }
 
   @Bean
-  UserDetailsService userDetailsService(UsersAuthRepository repo){
+  UserDetailsService userDetailsService(UserAuthRepository repo){
     return username -> {
       UserAuth u = repo.findByUsername(username)
           .orElseThrow(() -> new UsernameNotFoundException("No such user"));
@@ -60,9 +60,9 @@ public class SecurityConfig {
             .securityContext(sc -> sc.requireExplicitSave(false))
             .authorizeHttpRequests(reg -> reg
         .requestMatchers("/api/auth/**").permitAll()
-        .requestMatchers("/api/admin/**").hasRole("ADMIN")
-        .requestMatchers("/api/instructor/**").hasRole("INSTRUCTOR")
-        .requestMatchers("/api/student/**").hasRole("STUDENT")
+        .requestMatchers("/api/admin/**").hasAuthority("ADMIN")
+        .requestMatchers("/api/instructor/**").hasAuthority("INSTRUCTOR")
+        .requestMatchers("/api/student/**").hasAuthority("STUDENT")
         .anyRequest().authenticated()
       )
             .exceptionHandling(eh -> eh

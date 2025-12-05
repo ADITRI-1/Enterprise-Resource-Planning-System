@@ -7,7 +7,7 @@ import java.time.OffsetDateTime;
 import java.util.UUID;
 
 @Value
-@Builder
+@Builder(toBuilder = true)
 public class EnrollmentDomain {
     UUID enrollmentId;
     UUID studentId;

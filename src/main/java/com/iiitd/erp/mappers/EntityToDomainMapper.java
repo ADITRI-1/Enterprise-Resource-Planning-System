@@ -16,8 +16,6 @@ public interface EntityToDomainMapper {
     UserAuthDomain userAuthToDomain(UserAuth userAuth);
 
     @Mapping(target = "name", source = "studentName")
-    @Mapping(target = "rollNo", expression = "java(parseRoll(student.getRollNo()))")
-    @Mapping(target = "programId", source = "program_id")
     @Mapping(target = "yearOfRegistration", expression = "java(toYearString(student.getYear()))")
     StudentUserDomain studentToStudentUserDomain(Student student);
 
@@ -49,6 +47,5 @@ public interface EntityToDomainMapper {
 
     // helpers
     default DayOfWeek fromWeekday(Weekday day) { return day == null ? null : day.toJava(); }
-    default Integer parseRoll(String roll) { return roll == null || roll.isBlank() ? null : Integer.valueOf(roll); }
     default String toYearString(Integer year) { return year == null ? null : year.toString(); }
 }

@@ -1,3 +1,5 @@
+package com.iiitd.erp.ui;
+
 import javax.swing.*;
 import javax.swing.border.*;
 import java.awt.*;
@@ -441,7 +443,7 @@ public class FacultyAccountWindow extends JFrame {
     }
     public static void main(String[] args) {
     SwingUtilities.invokeLater(() -> {
-        new CreateFacultyAccountWindow().setVisible(true);
+        new FacultyAccountWindow().setVisible(true);
     });
 }
 }

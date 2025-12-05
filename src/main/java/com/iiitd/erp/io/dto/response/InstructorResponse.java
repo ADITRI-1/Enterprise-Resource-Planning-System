@@ -7,7 +7,7 @@ public record InstructorResponse(
         String name,
         String instructorCode,
         String dateOfBirth,
-        String department,
+        String deptId,
         String email,
         String phone
 ) {}

@@ -32,7 +32,7 @@ public class StudentPersistPortImpl implements StudentPersistPort {
     }
 
     @Override
-    public StudentUserDomain findByRollNo(Integer rollNo) {
+    public StudentUserDomain findByRollNo(String rollNo) {
         LOGGER.debug("Fetching student entity for roll {}", rollNo);
         try {
             Student student = studentRepository.findByRollNo(rollNo);
@@ -47,7 +47,7 @@ public class StudentPersistPortImpl implements StudentPersistPort {
 
     @Override
     public boolean saveStudent(StudentUserDomain studentDomain) {
-        Integer rollNo = studentDomain.getRollNo();
+        String rollNo = studentDomain.getRollNo();
         LOGGER.debug("Persisting student entity for roll {}", rollNo);
         try {
             Student student = DOMAIN_TO_ENTITY_MAPPER_INSTANCE.studentUserDomainToStudent(studentDomain);
@@ -63,7 +63,7 @@ public class StudentPersistPortImpl implements StudentPersistPort {
 
     @Override
     public StudentUserDomain updateStudent(StudentUserDomain studentDomain) {
-        Integer rollNo = studentDomain.getRollNo();
+        String rollNo = studentDomain.getRollNo();
         LOGGER.debug("Updating student entity for roll {}", rollNo);
         Student existing = studentRepository.findByRollNo(rollNo);
         if (existing == null) {
@@ -83,7 +83,7 @@ public class StudentPersistPortImpl implements StudentPersistPort {
     }
 
     @Override
-    public boolean deleteStudent(Integer rollNo) {
+    public boolean deleteStudent(String rollNo) {
         LOGGER.debug("Deleting student entity for roll {}", rollNo);
         Student existing = studentRepository.findByRollNo(rollNo);
         if (existing == null) {

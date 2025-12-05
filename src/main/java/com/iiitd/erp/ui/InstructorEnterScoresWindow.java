@@ -1,3 +1,5 @@
+package com.iiitd.erp.ui;
+
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import javax.swing.table.AbstractTableModel;

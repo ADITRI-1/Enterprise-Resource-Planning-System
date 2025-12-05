@@ -7,7 +7,7 @@ import java.time.LocalTime;
 
 @Value
 @Builder
-public class StudentTimetableSlotDomain {
+public class StudentTimeTableSlotDomain {
     int dayOfWeek;
     LocalTime startTime;
     LocalTime endTime;

@@ -6,7 +6,6 @@ import java.time.LocalDate;
 
 public record AssessmentComponentRequest(
         @NotBlank String name,
-        @DecimalMin(value = "0.0", inclusive = false) @DecimalMax(value = "1.0") BigDecimal weight,
+        @DecimalMin(value = "0.0", inclusive = false) @DecimalMax(value = "1.0") Double weight,
         @Positive int maxScore,
-        @Positive int scoreOutOf,
         LocalDate dueDate) {}

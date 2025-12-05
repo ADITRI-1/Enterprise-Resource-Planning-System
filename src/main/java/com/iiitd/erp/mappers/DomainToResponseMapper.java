@@ -16,7 +16,6 @@ public interface DomainToResponseMapper {
 
     StudentResponse studentDomainToResponse(StudentUserDomain studentUserDomain);
 
-    @Mapping(target = "department", source = "deptId")
     InstructorResponse instructorDomainToResponse(InstructorDomain instructorDomain);
 
     ProgramResponse programDomainToResponse(ProgramDomain programDomain);
@@ -42,7 +41,7 @@ public interface DomainToResponseMapper {
 
     RegistrationResult registrationOutcomeToResponse(RegistrationOutcomeDomain domain);
 
-    TimetableSlot studentTimetableSlotToResponse(StudentTimetableSlotDomain domain);
+    TimetableSlot studentTimeTableSlotToResponse(StudentTimeTableSlotDomain domain);
 
     GradeRow studentGradeDomainToResponse(StudentGradeDomain domain);
 }

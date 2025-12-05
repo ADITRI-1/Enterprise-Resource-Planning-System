@@ -2,6 +2,7 @@ package com.iiitd.erp.persistent.entity.erp_db;
 
 
 import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import lombok.AllArgsConstructor;
@@ -15,6 +16,8 @@ import java.util.UUID;
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
+
+@Entity
 @Table(name = "rooms", schema = "erp_db")
 public class Room {
     @Id

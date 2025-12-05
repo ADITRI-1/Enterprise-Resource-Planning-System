@@ -1,3 +1,5 @@
+package com.iiitd.erp.ui;
+
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
@@ -100,7 +102,7 @@ public class InstructorComputeGradesWindow extends JFrame {
 
         computeBtn.addActionListener(e -> {
             String selected = (String) courseCombo.getSelectedItem();
-            new GradeComputationWindow(selected, courses).setVisible(true);
+//            new GradeComputationWindow(selected, courses).setVisible(true);
         });
 
         controlRow.add(courseLbl);
