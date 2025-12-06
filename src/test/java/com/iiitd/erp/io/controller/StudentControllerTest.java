@@ -8,9 +8,7 @@ import com.iiitd.erp.core.service.MaintenanceService;
 import com.iiitd.erp.core.service.SectionService;
 import com.iiitd.erp.exception.ErrorCode;
 import com.iiitd.erp.exception.ErpException;
-import com.iiitd.erp.io.dto.request.DropRequest;
 import com.iiitd.erp.io.dto.request.RegisterRequest;
-import com.iiitd.erp.io.dto.response.GradeRow;
 import org.junit.jupiter.api.*;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -22,6 +20,7 @@ import org.springframework.security.authentication.TestingAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 
+import java.math.BigDecimal;
 import java.nio.file.Path;
 import java.time.LocalTime;
 import java.util.Collections;
@@ -29,7 +28,6 @@ import java.util.List;
 import java.util.Map;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.when;
 
 @ExtendWith(MockitoExtension.class)
@@ -108,7 +106,7 @@ class StudentControllerTest {
     void grades_success() {
         setAuth("uid1", "STUDENT", true);
         List<StudentGradeDomain> grades = List.of(
-                StudentGradeDomain.builder().courseCode("C1").courseTitle("T").component("MID").score(10.0).build());
+                StudentGradeDomain.builder().courseCode("C1").courseTitle("T").component("MID").score(BigDecimal.valueOf(10.0)).build());
         when(sections.gradesForStudent("uid1")).thenReturn(grades);
 
         ResponseEntity<?> resp = controller.grades("uid1");

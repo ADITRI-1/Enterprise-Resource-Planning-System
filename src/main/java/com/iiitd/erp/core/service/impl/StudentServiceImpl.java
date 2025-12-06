@@ -19,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 @Service
 @Transactional
@@ -52,15 +53,16 @@ public class StudentServiceImpl implements StudentService {
         ensureProgramExists(studentDomain.getProgramId());
 
         try {
+            UUID userId = UUID.randomUUID();
             String username = buildStudentUsername(studentDomain);
             String rawPassword = buildStudentPassword(studentDomain);
             String passwordHash = passwordEncoder.encode(rawPassword);
 
             userAuthPersistPort.save(UserAuthDomain.builder()
                     .username(username)
-                    .role("STUDENT")
+                    .role("student")
                     .passwordHash(passwordHash)
-                    .status("ACTIVE")
+                    .status("active")
                     .active(true)
                     .build());
 

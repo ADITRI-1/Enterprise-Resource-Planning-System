@@ -1,20 +1,18 @@
-package com.iiitd.erp.ui;//import university_erp.CreateUserWindow;
+package com.iiitd.erp.ui;
+
+import com.iiitd.erp.ui.client.AdminClient;
 import javax.swing.*;
-import javax.swing.border.*;
+import javax.swing.border.EmptyBorder;
 import java.awt.*;
 import java.awt.event.*;
 
-/**
- * AdminDashboardExact
- * - Recreates the reference UI and draws the IIITD logo precisely in vector form.
- * - Now includes a sliding-left-panel behavior on hover.
- */
 public class AdminDashboardExact extends JFrame {
+
+    private final AdminClient admin;
 
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> {
             try {
-                // Crisp text on Windows/Linux
                 System.setProperty("awt.useSystemAAFontSettings", "on");
                 System.setProperty("swing.aatext", "true");
             } catch (Exception ignored) {}
@@ -22,7 +20,10 @@ public class AdminDashboardExact extends JFrame {
         });
     }
 
-    public AdminDashboardExact() {
+    public AdminDashboardExact() { this(null); }
+
+    public AdminDashboardExact(AdminClient admin) {
+        this.admin = admin;
         setTitle("IIIT ERP — Admin Dashboard");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
         setSize(1280, 780);
@@ -36,228 +37,125 @@ public class AdminDashboardExact extends JFrame {
         main.setBackground(new Color(245, 248, 251));
         add(main, BorderLayout.CENTER);
 
-        // ✅ Wrapped LeftRail inside SlidingPanel
-        SlidingPanel slidingLeft = new SlidingPanel(new LeftRail());
-        main.add(slidingLeft, BorderLayout.WEST);
-
+        main.add(new SlidingPanel(new LeftRail()), BorderLayout.WEST);
         main.add(new ContentArea(), BorderLayout.CENTER);
     }
 
-    // ---------------- SLIDING PANEL WRAPPER ----------------
-    // ---------------- SLIDING PANEL (FIXED VERSION) ----------------
-// ---------------- SLIDING PANEL WITH ARROW + FULL HEIGHT FIX ----------------
-static class SlidingPanel extends JPanel {
-
-    private final JPanel content;
-    private final ArrowIndicator arrow;
-    private final int expandedWidth = 320;
-    private final int collapsedWidth = 36;
-
-    private boolean expanded = false;
-    private Timer animator;
-
-    SlidingPanel(JPanel inner) {
-        this.content = inner;
-        setLayout(null);                  // Needed for sliding animation
-        setPreferredSize(new Dimension(collapsedWidth, 0));
-        setOpaque(false);
-
-        // -------- ARROW INDICATOR (always visible) --------
-        arrow = new ArrowIndicator();
-        arrow.setBounds(0, 0, collapsedWidth, 60);
-        add(arrow);
-
-        // -------- CONTENT PANEL (LeftRail) --------
-        inner.setOpaque(false);
-        add(inner);
-
-        // Hover to expand
-        arrow.addMouseListener(new MouseAdapter() {
-            @Override public void mouseEntered(MouseEvent e) { expand(); }
-        });
-
-        // Collapse when mouse leaves full panel
-        addMouseListener(new MouseAdapter() {
-            @Override public void mouseExited(MouseEvent e) { collapseWhenOutside(); }
-        });
-
-        inner.addMouseListener(new MouseAdapter() {
-            @Override public void mouseExited(MouseEvent e) { collapseWhenOutside(); }
-        });
-    }
-
-    @Override
-    public void doLayout() {
-        int h = getParent().getHeight();    // ✅ correctly follow screen height
-
-        arrow.setBounds(0, 0, collapsedWidth, h);
-
-        if (expanded) {
-            content.setBounds(0, 0, expandedWidth, h);
-        } else {
-            content.setBounds(collapsedWidth, 0, expandedWidth, h);
-        }
-    }
-
-    private void expand() {
-        if (expanded) return;
-        expanded = true;
-        arrow.setExpanded(true);
-        animateWidth(getWidth(), expandedWidth);
-    }
-
-    private void collapseWhenOutside() {
-        Timer t = new Timer(120, ev -> {
-            Point p = MouseInfo.getPointerInfo().getLocation();
-            SwingUtilities.convertPointFromScreen(p, this);
-
-            if (p.x < 0 || p.x > getWidth() || p.y < 0 || p.y > getHeight()) {
-                collapse();
-            }
-        });
-        t.setRepeats(false);
-        t.start();
-    }
-
-    private void collapse() {
-        if (!expanded) return;
-        expanded = false;
-        arrow.setExpanded(false);
-        animateWidth(getWidth(), collapsedWidth);
-    }
-
-    private void animateWidth(int start, int end) {
-        if (animator != null && animator.isRunning()) animator.stop();
-
-        animator = new Timer(5, null);
-        animator.addActionListener(e -> {
-            int curr = getWidth();
-            int step = (end > start) ? 12 : -12;
-            int next = curr + step;
-
-            if ((step > 0 && next >= end) || (step < 0 && next <= end)) {
-                next = end;
-                animator.stop();
-            }
-
-            setPreferredSize(new Dimension(next, getHeight()));
-            revalidate();
-            repaint();
-        });
-
-        animator.start();
-    }
-
-    // ---------- Arrow indicator (rotates when expanded) ----------
-    static class ArrowIndicator extends JPanel {
-
+    static class SlidingPanel extends JPanel {
+        private final JPanel content;
+        private final ArrowIndicator arrow;
+        private final int expandedWidth = 320;
+        private final int collapsedWidth = 36;
         private boolean expanded = false;
+        private Timer animator;
 
-        ArrowIndicator() {
+        SlidingPanel(JPanel inner) {
+            this.content = inner;
+            setLayout(null);
+            setPreferredSize(new Dimension(collapsedWidth, 0));
             setOpaque(false);
+
+            arrow = new ArrowIndicator();
+            add(arrow);
+
+            inner.setOpaque(false);
+            add(inner);
+
+            arrow.addMouseListener(new MouseAdapter() { @Override public void mouseEntered(MouseEvent e) { expand(); } });
+            addMouseListener(new MouseAdapter() { @Override public void mouseExited(MouseEvent e) { collapseWhenOutside(); } });
+            inner.addMouseListener(new MouseAdapter() { @Override public void mouseExited(MouseEvent e) { collapseWhenOutside(); } });
         }
 
-        void setExpanded(boolean b) {
-            expanded = b;
-            repaint();
+        @Override public void doLayout() {
+            int h = getParent().getHeight();
+            arrow.setBounds(0, 0, collapsedWidth, h);
+            if (expanded) content.setBounds(0, 0, expandedWidth, h);
+            else content.setBounds(collapsedWidth, 0, expandedWidth, h);
         }
 
-        @Override
-        protected void paintComponent(Graphics g) {
-            super.paintComponent(g);
-            Graphics2D g2 = (Graphics2D) g;
-            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+        private void expand() {
+            if (expanded) return;
+            expanded = true;
+            arrow.setExpanded(true);
+            animateWidth(getWidth(), expandedWidth);
+        }
 
-            // background strip
-            g2.setColor(new Color(230, 233, 240));
-            g2.fillRect(0, 0, getWidth(), getHeight());
+        private void collapseWhenOutside() {
+            Timer t = new Timer(120, ev -> {
+                Point p = MouseInfo.getPointerInfo().getLocation();
+                SwingUtilities.convertPointFromScreen(p, this);
+                if (p.x < 0 || p.x > getWidth() || p.y < 0 || p.y > getHeight()) collapse();
+            });
+            t.setRepeats(false);
+            t.start();
+        }
 
-            // arrow triangle
-            g2.setColor(new Color(70, 80, 95));
-            int mid = getHeight() / 2;
+        private void collapse() {
+            if (!expanded) return;
+            expanded = false;
+            arrow.setExpanded(false);
+            animateWidth(getWidth(), collapsedWidth);
+        }
 
-            int[] x, y;
+        private void animateWidth(int start, int end) {
+            if (animator != null && animator.isRunning()) animator.stop();
+            animator = new Timer(5, null);
+            animator.addActionListener(e -> {
+                int curr = getWidth();
+                int step = (end > start) ? 12 : -12;
+                int next = curr + step;
+                if ((step > 0 && next >= end) || (step < 0 && next <= end)) { next = end; animator.stop(); }
+                setPreferredSize(new Dimension(next, getHeight()));
+                revalidate();
+                repaint();
+            });
+            animator.start();
+        }
 
-            if (expanded) {
-                // pointing left (collapse)
-                x = new int[]{20, 10, 20};
-                y = new int[]{mid - 10, mid, mid + 10};
-            } else {
-                // pointing right (expand)
-                x = new int[]{10, 20, 10};
-                y = new int[]{mid - 10, mid, mid + 10};
+        static class ArrowIndicator extends JPanel {
+            private boolean expanded = false;
+            ArrowIndicator() { setOpaque(false); }
+            void setExpanded(boolean b) { expanded = b; repaint(); }
+            @Override protected void paintComponent(Graphics g) {
+                super.paintComponent(g);
+                Graphics2D g2 = (Graphics2D) g;
+                g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
+                g2.setColor(new Color(230, 233, 240));
+                g2.fillRect(0, 0, getWidth(), getHeight());
+                g2.setColor(new Color(70, 80, 95));
+                int mid = getHeight() / 2;
+                int[] x, y;
+                if (expanded) { x = new int[]{20, 10, 20}; y = new int[]{mid - 10, mid, mid + 10}; }
+                else { x = new int[]{10, 20, 10}; y = new int[]{mid - 10, mid, mid + 10}; }
+                g2.fillPolygon(x, y, 3);
             }
-
-            g2.fillPolygon(x, y, 3);
         }
     }
-}
 
-
-
-    // ---------------- HEADER BAR ----------------
     static class HeaderBar extends JPanel {
-        private final Color NAVY = new Color(9, 53, 82);
-        private final Color TEAL = new Color(85, 172, 168);
-        private final Color WHITE = Color.WHITE;
-
         HeaderBar() { setPreferredSize(new Dimension(0, 64)); }
-
-        @Override
-        protected void paintComponent(Graphics g) {
+        @Override protected void paintComponent(Graphics g) {
             super.paintComponent(g);
             Graphics2D g2 = (Graphics2D) g.create();
             g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-
-            g2.setColor(NAVY);
-            g2.fillRect(0, 0, getWidth(), getHeight());
-
-            int left = 24;
-            int cy = getHeight() / 2;
-
-            g2.setColor(WHITE);
-            int barW = 8, barH = 38, barR = 4, gap = 8;
-            int x = left;
-            int barY = cy - barH / 2;
-
-            for (int i = 0; i < 4; i++) {
-                g2.fillRoundRect(x, barY, barW, barH, barR, barR);
-                x += barW + gap;
-            }
-
-            int dOuter = 36;
-            int dX = x - 15;
-            int dY = cy - dOuter / 2;
-
-            g2.setColor(TEAL);
-            g2.setStroke(new BasicStroke(8f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
-            g2.drawArc(dX, dY, dOuter, dOuter, -90, 180);
-
-            g2.setColor(new Color(255, 255, 255, 170));
-            int sepX = dX + dOuter + 16;
-            g2.fillRect(sepX, 12, 2, getHeight() - 24);
-
-            g2.setColor(WHITE);
-            Font base = new Font("Segoe UI", Font.BOLD, 16);
-            g2.setFont(base);
-            int textX = sepX + 16;
-            g2.drawString("INDRAPRASTHA INSTITUTE of", textX, cy - 4);
-
-            String line2 = "INFORMATION TECHNOLOGY";
-            int y2 = cy + 18;
-            g2.drawString(line2, textX, y2);
-
-            FontMetrics fm = g2.getFontMetrics(base);
-            int delhiX = textX + fm.stringWidth(line2) + 8;
-            g2.setColor(TEAL);
-            g2.drawString("DELHI", delhiX, y2);
-
+            g2.setColor(new Color(9, 53, 82)); g2.fillRect(0, 0, getWidth(), getHeight());
+            int left = 24; int cy = getHeight() / 2;
+            g2.setColor(Color.WHITE);
+            int barW = 8, barH = 38, barR = 4, gap = 8, x = left, barY = cy - barH / 2;
+            for (int i = 0; i < 4; i++) { g2.fillRoundRect(x, barY, barW, barH, barR, barR); x += barW + gap; }
+            int dOuter = 36, dX = x - 15, dY = cy - dOuter / 2;
+            g2.setColor(new Color(85, 172, 168)); g2.setStroke(new BasicStroke(8f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND)); g2.drawArc(dX, dY, dOuter, dOuter, -90, 180);
+            g2.setColor(new Color(255, 255, 255, 170)); int sepX = dX + dOuter + 16; g2.fillRect(sepX, 12, 2, getHeight() - 24);
+            g2.setColor(Color.WHITE); Font base = new Font("Segoe UI", Font.BOLD, 16); g2.setFont(base);
+            int textX = sepX + 16; g2.drawString("INDRAPRASTHA INSTITUTE of", textX, cy - 4);
+            String line2 = "INFORMATION TECHNOLOGY"; int y2 = cy + 18; g2.drawString(line2, textX, y2);
+            FontMetrics fm = g2.getFontMetrics(base); int delhiX = textX + fm.stringWidth(line2) + 8;
+            g2.setColor(new Color(85, 172, 168)); g2.drawString("DELHI", delhiX, y2);
             g2.dispose();
         }
     }
 
-    // ---------------- LEFT RAIL ----------------
-    static class LeftRail extends JPanel {
+    class LeftRail extends JPanel {
         LeftRail() {
             setPreferredSize(new Dimension(320, 0));
             setBackground(new Color(245, 248, 251));
@@ -310,12 +208,8 @@ static class SlidingPanel extends JPanel {
                     super.paintComponent(g);
                     Graphics2D g2 = (Graphics2D) g;
                     g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-
-                    g2.setColor(bg);
-                    g2.fillRoundRect(0, 0, getWidth(), getHeight(), 14, 14);
-
-                    g2.setColor(border);
-                    g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 14, 14);
+                    g2.setColor(bg); g2.fillRoundRect(0, 0, getWidth(), getHeight(), 14, 14);
+                    g2.setColor(border); g2.drawRoundRect(0, 0, getWidth() - 1, getHeight() - 1, 14, 14);
                 }
             };
             p.setOpaque(false);
@@ -340,103 +234,50 @@ static class SlidingPanel extends JPanel {
             p.add(left, BorderLayout.WEST);
 
             p.addMouseListener(new MouseAdapter() {
-                @Override public void mouseEntered(MouseEvent e) {
-                    p.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-                    p.setBackground(new Color(245, 248, 255));
-                }
-                @Override public void mouseExited(MouseEvent e) {
-                    p.setCursor(Cursor.getDefaultCursor());
-                    p.setBackground(bg);
-                }
                 @Override public void mouseClicked(MouseEvent e) {
-
-    switch (text) {
-
-        case "Create User":
-            new CreateUserWindow().setVisible(true);
-            break;
-
-        case "Create Courses":
-            new CreateCoursesWindow().setVisible(true);
-            break;
-
-        case "Create Sections":
-            new CreateSectionWindow().setVisible(true);
-            break;
-    }
-}
+                    System.out.println("Nav click: " + text + " admin=" + (admin != null));
+                    switch (text) {
+                        case "Create User" -> new CreateUserWindow(admin).setVisible(true);
+                        case "Create Courses" -> new CreateCoursesWindow(admin).setVisible(true);
+                        case "Create Sections" -> new CreateSectionWindow(admin).setVisible(true);
+                    }
+                }
             });
 
             return p;
         }
 
-        private static JPanel centerWrap(JComponent c) {
-            JPanel p = new JPanel();
-            p.setOpaque(false);
-            p.add(c);
-            return p;
-        }
+        private JPanel centerWrap(JComponent c) { JPanel p = new JPanel(); p.setOpaque(false); p.add(c); return p; }
+        private JPanel margin(JComponent c, int t, int l, int b, int r) { JPanel p = new JPanel(new BorderLayout()); p.setOpaque(false); p.setBorder(new EmptyBorder(t,l,b,r)); p.add(c, BorderLayout.CENTER); return p; }
+        private JPanel cardWrap(JComponent inner) { JPanel outer = new JPanel(new BorderLayout()); outer.setOpaque(false); outer.add(inner, BorderLayout.CENTER); return outer; }
+        private JLabel label(String s, int sz, int st, Color col) { JLabel l = new JLabel(s); l.setFont(new Font("Segoe UI", st, sz)); l.setForeground(col); return l; }
 
-        private static JPanel margin(JComponent c, int t, int l, int b, int r) {
-            JPanel p = new JPanel(new BorderLayout());
-            p.setOpaque(false);
-            p.setBorder(new EmptyBorder(t, l, b, r));
-            p.add(c, BorderLayout.CENTER);
-            return p;
-        }
-
-        private static JPanel cardWrap(JComponent inner) {
-            JPanel outer = new JPanel(new BorderLayout());
-            outer.setOpaque(false);
-            outer.add(inner, BorderLayout.CENTER);
-            return outer;
-        }
-
-        private static JLabel label(String s, int sz, int st, Color col) {
-            JLabel l = new JLabel(s);
-            l.setFont(new Font("Segoe UI", st, sz));
-            l.setForeground(col);
-            return l;
-        }
-
-        static class Avatar extends JComponent {
+        class Avatar extends JComponent {
             private final String initial;
-
-            Avatar(String initial) {
-                this.initial = initial;
-                setPreferredSize(new Dimension(120, 120));
-            }
-
+            Avatar(String initial) { this.initial = initial; setPreferredSize(new Dimension(120, 120)); }
             @Override protected void paintComponent(Graphics g) {
                 Graphics2D g2 = (Graphics2D) g;
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-
                 int d = Math.min(getWidth(), getHeight());
                 int x = (getWidth() - d) / 2;
                 int y = (getHeight() - d) / 2;
-
                 g2.setColor(new Color(245, 248, 251));
                 g2.fillOval(x, y, d, d);
-
                 g2.setStroke(new BasicStroke(6f));
                 g2.setColor(new Color(230, 234, 239));
                 g2.drawOval(x + 3, y + 3, d - 6, d - 6);
-
                 g2.setColor(new Color(46, 56, 66));
                 Font f = new Font("Segoe UI", Font.BOLD, d / 2);
                 g2.setFont(f);
-
                 FontMetrics fm = g2.getFontMetrics();
                 int tx = getWidth() / 2 - fm.stringWidth(initial) / 2;
                 int ty = getHeight() / 2 + fm.getAscent() / 2 - 6;
-
                 g2.drawString(initial, tx, ty);
             }
         }
     }
 
-    // ---------------- CENTER CONTENT ----------------
-    static class ContentArea extends JPanel {
+    class ContentArea extends JPanel {
         ContentArea() {
             setOpaque(false);
             setLayout(new BorderLayout());
@@ -468,37 +309,30 @@ static class SlidingPanel extends JPanel {
             gbc.fill = GridBagConstraints.BOTH;
             gbc.weightx = 1; gbc.weighty = 1;
 
-            gbc.gridx = 0; gbc.gridy = 0;
-            grid.add(cardCreateUser(), gbc);
-
-            gbc.gridx = 1; gbc.gridy = 0;
-            grid.add(cardCreateCourses(), gbc);
-
-            gbc.gridx = 0; gbc.gridy = 1;
-            grid.add(cardCreateSections(), gbc);
-
-            gbc.gridx = 1; gbc.gridy = 1;
-            grid.add(cardMaintenance(), gbc);
+            gbc.gridx = 0; gbc.gridy = 0; grid.add(cardCreateUser(), gbc);
+            gbc.gridx = 1; gbc.gridy = 0; grid.add(cardCreateCourses(), gbc);
+            gbc.gridx = 0; gbc.gridy = 1; grid.add(cardCreateSections(), gbc);
+            gbc.gridx = 1; gbc.gridy = 1; grid.add(cardMaintenance(), gbc);
 
             add(margin(grid, 0, 8, 0, 16), BorderLayout.CENTER);
         }
 
-        private static JPanel cardCreateUser() {
+        private JPanel cardCreateUser() {
             return card("CREATE USER", "Enroll new students or staff", "Create Account",
-                    e -> new CreateUserWindow().setVisible(true));
+                    e -> { System.out.println("Card click: Create User admin=" + (admin != null)); new CreateUserWindow(admin).setVisible(true); });
         }
 
-        private static JPanel cardCreateCourses() {
-    return card("CREATE COURSES", "Define your offerings and sections", "Manage Courses",
-        e -> new CreateCoursesWindow().setVisible(true));
-}
+        private JPanel cardCreateCourses() {
+            return card("CREATE COURSES", "Define your offerings and sections", "Manage Courses",
+                    e -> { System.out.println("Card click: Create Courses admin=" + (admin != null)); new CreateCoursesWindow(admin).setVisible(true); });
+        }
 
-private static JPanel cardCreateSections() {
-    return card("CREATE SECTIONS", "Organize course instances", "Refine Sections",
-        e -> new CreateSectionWindow().setVisible(true));
-}
+        private JPanel cardCreateSections() {
+            return card("CREATE SECTIONS", "Organize course instances", "Refine Sections",
+                    e -> { System.out.println("Card click: Create Sections admin=" + (admin != null)); new CreateSectionWindow(admin).setVisible(true); });
+        }
 
-        private static JPanel cardMaintenance() {
+        private JPanel cardMaintenance() {
             JPanel card = baseCard();
             card.setLayout(new BorderLayout());
             card.add(cardTexts("MAINTENANCE MODE", "Toggle system availability"), BorderLayout.NORTH);
@@ -511,6 +345,8 @@ private static JPanel cardCreateSections() {
             label.setFont(new Font("Segoe UI", Font.PLAIN, 16));
             label.setForeground(new Color(60, 72, 88));
 
+            toggle.addActionListener(e -> System.out.println("Maintenance toggle clicked (no backend wire-up here)"));
+
             row.add(toggle);
             row.add(label);
 
@@ -518,7 +354,7 @@ private static JPanel cardCreateSections() {
             return card;
         }
 
-        private static JPanel card(String title, String subtitle, String cta, ActionListener al) {
+        private JPanel card(String title, String subtitle, String cta, ActionListener al) {
             JPanel card = baseCard();
             card.setLayout(new BorderLayout());
             card.add(cardTexts(title, subtitle), BorderLayout.NORTH);
@@ -534,11 +370,9 @@ private static JPanel cardCreateSections() {
             return card;
         }
 
-        private static JPanel baseCard() {
-            return new ShadowCard();
-        }
+        private JPanel baseCard() { return new ShadowCard(); }
 
-        private static JPanel cardTexts(String title, String subtitle) {
+        private JPanel cardTexts(String title, String subtitle) {
             JPanel p = new JPanel();
             p.setOpaque(false);
             p.setLayout(new BoxLayout(p, BoxLayout.Y_AXIS));
@@ -557,7 +391,7 @@ private static JPanel cardCreateSections() {
             return p;
         }
 
-        private static JButton primaryButton(String text) {
+        private JButton primaryButton(String text) {
             JButton b = new JButton(text);
             b.setFont(new Font("Segoe UI", Font.BOLD, 18));
             b.setForeground(Color.WHITE);
@@ -567,18 +401,14 @@ private static JPanel cardCreateSections() {
             b.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
 
             b.addMouseListener(new MouseAdapter() {
-                @Override public void mouseEntered(MouseEvent e) {
-                    b.setBackground(new Color(35, 111, 182));
-                }
-                @Override public void mouseExited(MouseEvent e) {
-                    b.setBackground(new Color(43, 123, 196));
-                }
+                @Override public void mouseEntered(MouseEvent e) { b.setBackground(new Color(35, 111, 182)); }
+                @Override public void mouseExited(MouseEvent e) { b.setBackground(new Color(43, 123, 196)); }
             });
 
             return b;
         }
 
-        private static JPanel margin(JComponent c, int t, int l, int b, int r) {
+        private JPanel margin(JComponent c, int t, int l, int b, int r) {
             JPanel p = new JPanel(new BorderLayout());
             p.setOpaque(false);
             p.setBorder(new EmptyBorder(t, l, b, r));
@@ -587,31 +417,19 @@ private static JPanel cardCreateSections() {
         }
     }
 
-    // ---------------- SHADOWED CARD ----------------
     static class ShadowCard extends JPanel {
-        ShadowCard() {
-            setOpaque(false);
-            setBorder(new EmptyBorder(0, 0, 16, 16));
-        }
-
+        ShadowCard() { setOpaque(false); setBorder(new EmptyBorder(0, 0, 16, 16)); }
         @Override protected void paintComponent(Graphics g) {
             Graphics2D g2 = (Graphics2D) g.create();
             g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-
-            g2.setColor(new Color(0, 0, 0, 28));
-            g2.fillRoundRect(10, 10, getWidth() - 26, getHeight() - 26, 18, 18);
-
-            g2.setColor(Color.WHITE);
-            g2.fillRoundRect(0, 0, getWidth() - 16, getHeight() - 16, 18, 18);
-
+            g2.setColor(new Color(0, 0, 0, 28)); g2.fillRoundRect(10, 10, getWidth() - 26, getHeight() - 26, 18, 18);
+            g2.setColor(Color.WHITE); g2.fillRoundRect(0, 0, getWidth() - 16, getHeight() - 16, 18, 18);
             g2.dispose();
             super.paintComponent(g);
         }
-
         @Override public Dimension getPreferredSize() { return new Dimension(520, 240); }
     }
 
-    // ---------------- IOS SWITCH ----------------
     static class IOSSwitch extends JToggleButton {
         IOSSwitch() {
             setPreferredSize(new Dimension(88, 32));
@@ -620,54 +438,28 @@ private static JPanel cardCreateSections() {
             setContentAreaFilled(false);
             setModel(new ToggleButtonModel());
         }
-
         @Override protected void paintComponent(Graphics g) {
             Graphics2D g2 = (Graphics2D) g.create();
             g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-
-            int w = getWidth(), h = getHeight();
-            int r = h;
-
+            int w = getWidth(), h = getHeight(), r = h;
             g2.setColor(isSelected() ? new Color(48, 141, 219) : new Color(206, 212, 218));
             g2.fillRoundRect(0, 0, w, h, r, r);
-
-            int pad = 3;
-            int d = h - pad * 2;
-            int x = isSelected() ? w - d - pad : pad;
-
-            g2.setColor(Color.WHITE);
-            g2.fillOval(x, pad, d, d);
-
+            int pad = 3, d = h - pad * 2, x = isSelected() ? w - d - pad : pad;
+            g2.setColor(Color.WHITE); g2.fillOval(x, pad, d, d);
             g2.dispose();
         }
     }
 
-    // ---------------- FOOTER BAR ----------------
     static class FooterBar extends JPanel {
-        private final Color NAVY = new Color(9, 53, 82);
-
         FooterBar() { setPreferredSize(new Dimension(0, 54)); }
-
         @Override protected void paintComponent(Graphics g) {
             super.paintComponent(g);
             Graphics2D g2 = (Graphics2D) g.create();
-
-            g2.setColor(NAVY);
-            g2.fillRect(0, 0, getWidth(), getHeight());
-
-            g2.setColor(Color.WHITE);
-            g2.setFont(new Font("Segoe UI", Font.PLAIN, 16));
-
+            g2.setColor(new Color(9, 53, 82)); g2.fillRect(0, 0, getWidth(), getHeight());
+            g2.setColor(Color.WHITE); g2.setFont(new Font("Segoe UI", Font.PLAIN, 16));
             String[] items = { "© 2024 IIT Delhi", "Privacy Policy", "Terms & Service" };
-            int gap = 28;
-            int y = (getHeight() + g2.getFontMetrics().getAscent()) / 2 - 4;
-
-            int x = 30;
-            for (String s : items) {
-                g2.drawString(s, x, y);
-                x += g2.getFontMetrics().stringWidth(s) + gap;
-            }
-
+            int gap = 28, y = (getHeight() + g2.getFontMetrics().getAscent()) / 2 - 4, x = 30;
+            for (String s : items) { g2.drawString(s, x, y); x += g2.getFontMetrics().stringWidth(s) + gap; }
             g2.dispose();
         }
     }

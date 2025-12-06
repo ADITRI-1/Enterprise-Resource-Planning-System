@@ -55,8 +55,8 @@ public class SecurityConfig {
   SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
     http
       // .requiresChannel(ch -> ch.anyRequest().requiresSecure()) // enable behind HTTPS
-      .csrf(csrf -> csrf.ignoringRequestMatchers("/api/auth/login", "/api/auth/logout"))
-      .sessionManagement(sm -> sm.sessionFixation().migrateSession())
+            .csrf(csrf -> csrf.ignoringRequestMatchers("/api/**"))
+              .sessionManagement(sm -> sm.sessionFixation().migrateSession())
             .securityContext(sc -> sc.requireExplicitSave(false))
             .authorizeHttpRequests(reg -> reg
         .requestMatchers("/api/auth/**").permitAll()

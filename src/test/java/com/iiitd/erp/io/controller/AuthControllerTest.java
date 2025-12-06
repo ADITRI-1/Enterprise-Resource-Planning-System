@@ -2,110 +2,124 @@ package com.iiitd.erp.io.controller;
 
 import com.iiitd.erp.Domain.AuthResultDomain;
 import com.iiitd.erp.core.service.AuthSessionService;
+import com.iiitd.erp.core.service.MaintenanceService;
 import com.iiitd.erp.exception.ErrorCode;
 import com.iiitd.erp.exception.ErpException;
-import com.iiitd.erp.io.dto.request.LoginRequest;
-import com.iiitd.erp.io.dto.response.LoginResponse;
-import jakarta.servlet.http.HttpServletRequest;
+import com.iiitd.erp.io.controller.support.MaintenanceReadOnlyInterceptor;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.InjectMocks;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
+import org.mockito.Mockito;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockHttpSession;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
+import org.springframework.test.web.servlet.MockMvc;
 
-import java.time.OffsetDateTime;
 import java.util.Map;
 import java.util.UUID;
 
-import static org.junit.jupiter.api.Assertions.*;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-@ExtendWith(MockitoExtension.class)
+@WebMvcTest(AuthController.class)
+@AutoConfigureMockMvc(addFilters = false)
 class AuthControllerTest {
 
-    @Mock private AuthSessionService authSessionService;
-    @InjectMocks private AuthController controller;
+    @Autowired MockMvc mvc;
 
-    private static AuthResultDomain sampleAuth() {
-        return AuthResultDomain.builder()
-                .userId(UUID.fromString("11111111-1111-1111-1111-111111111111"))
-                .username("student1")
-                .role("STUDENT")
-                .sessionId("sid-123")
-                .lastLogin(OffsetDateTime.now())
-                .firstLogin(false)
+    @MockitoBean AuthSessionService authSessionService;
+    @MockitoBean MaintenanceService maintenanceService;
+    @MockitoBean MaintenanceReadOnlyInterceptor maintenanceInterceptor;
+
+    @Test
+    void login_success() throws Exception {
+        var domain = AuthResultDomain.builder()
+                .userId(UUID.randomUUID())
+                .username("admin1")
+                .role("ADMIN")
+                .sessionId("sid123")
                 .build();
+
+        Mockito.when(authSessionService.loginAndCreateSession(eq("admin1"), eq("password"), any()))
+                .thenReturn(domain);
+
+        mvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"username\":\"admin1\",\"password\":\"password\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("username").value("admin1"))
+                .andExpect(jsonPath("role").value("ADMIN"));
     }
 
     @Test
-    void login_success() {
-        when(authSessionService.loginAndCreateSession(eq("student1"), eq("password"), any()))
-                .thenReturn(sampleAuth());
+    void login_business_error_returns_401() throws Exception {
+        Mockito.when(authSessionService.loginAndCreateSession(eq("admin1"), eq("wrong"), any()))
+                .thenThrow(ErpException.of(ErrorCode.AUTHENTICATION_FAILED, Map.of()));
 
-        ResponseEntity<?> resp = controller.login(
-                new LoginRequest("student1", "password"),
-                mock(HttpServletRequest.class));
-
-        assertEquals(HttpStatus.OK, resp.getStatusCode());
-        LoginResponse body = (LoginResponse) resp.getBody();
-        assertNotNull(body);
-        assertEquals("student1", body.username());
-        assertEquals("STUDENT", body.role());
+        mvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"username\":\"admin1\",\"password\":\"wrong\"}"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("errorCode").value(ErrorCode.AUTHENTICATION_FAILED.getCode()))
+                .andExpect(jsonPath("message").value(ErrorCode.AUTHENTICATION_FAILED.getDefaultMessage()));
     }
 
     @Test
-    void login_authFailure() {
-        when(authSessionService.loginAndCreateSession(eq("student1"), eq("bad"), any()))
-                .thenThrow(ErpException.of(ErrorCode.AUTHENTICATION_FAILED, Map.of("username", "student1")));
-
-        ResponseEntity<?> resp = controller.login(
-                new LoginRequest("student1", "bad"),
-                mock(HttpServletRequest.class));
-
-        assertEquals(HttpStatus.UNAUTHORIZED, resp.getStatusCode());
-    }
-
-    @Test
-    void login_unexpected() {
-        when(authSessionService.loginAndCreateSession(eq("student1"), eq("password"), any()))
+    void login_unexpected_error_returns_500() throws Exception {
+        Mockito.when(authSessionService.loginAndCreateSession(eq("admin1"), eq("password"), any()))
                 .thenThrow(new RuntimeException("boom"));
 
-        ResponseEntity<?> resp = controller.login(
-                new LoginRequest("student1", "password"),
-                mock(HttpServletRequest.class));
-
-        assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, resp.getStatusCode());
+        mvc.perform(post("/api/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"username\":\"admin1\",\"password\":\"password\"}"))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("errorCode").value(ErrorCode.AUTHENTICATION_FAILED.getCode()))
+                .andExpect(jsonPath("message").value(ErrorCode.AUTHENTICATION_FAILED.format("admin1")));
     }
 
     @Test
-    void me_authenticated() {
-        when(authSessionService.currentUser(any())).thenReturn(sampleAuth());
+    void me_returns_current_user() throws Exception {
+        UUID userId = UUID.randomUUID();
+        var domain = AuthResultDomain.builder()
+                .userId(userId)
+                .username("admin1")
+                .role("ADMIN")
+                .sessionId("sid123")
+                .build();
+        Mockito.when(authSessionService.currentUser(any())).thenReturn(domain);
 
-        ResponseEntity<?> resp = controller.me(mock(HttpServletRequest.class));
-
-        assertEquals(HttpStatus.OK, resp.getStatusCode());
-        AuthResultDomain body = (AuthResultDomain) resp.getBody();
-        assertNotNull(body);
-        assertEquals("student1", body.getUsername());
+        mvc.perform(get("/api/auth/me"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("userId").value(userId.toString()))
+                .andExpect(jsonPath("username").value("admin1"))
+                .andExpect(jsonPath("role").value("ADMIN"));
     }
 
     @Test
-    void me_notAuthenticated() {
-        when(authSessionService.currentUser(any())).thenReturn(null);
+    void me_returns_401_when_not_authenticated() throws Exception {
+        Mockito.when(authSessionService.currentUser(any())).thenReturn(null);
 
-        ResponseEntity<?> resp = controller.me(mock(HttpServletRequest.class));
-
-        assertEquals(HttpStatus.UNAUTHORIZED, resp.getStatusCode());
+        mvc.perform(get("/api/auth/me"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("errorCode").value(ErrorCode.AUTH_NOT_AUTHENTICATED.getCode()))
+                .andExpect(jsonPath("message").value(ErrorCode.AUTH_NOT_AUTHENTICATED.getDefaultMessage()));
     }
 
     @Test
-    void logout_ok() {
-        ResponseEntity<?> resp = controller.logout(mock(HttpServletRequest.class));
-        assertEquals(HttpStatus.OK, resp.getStatusCode());
+    void logout_invalidates_session() throws Exception {
+        MockHttpSession session = new MockHttpSession();
+        session.setAttribute("key", "value");
+
+        mvc.perform(post("/api/auth/logout").session(session))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("message").value("Logged out"));
+
+        assertThrows(IllegalStateException.class, () -> session.getAttribute("key"));
     }
 }

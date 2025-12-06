@@ -1,12 +1,8 @@
 package com.iiitd.erp.ui;
 
 import com.iiitd.erp.ui.client.AuthClient;
+import com.iiitd.erp.ui.client.AdminClient;
 import com.iiitd.erp.ui.client.AuthClient.LoginResult;
-import com.iiitd.erp.ui.AdminDashboardExact;
-import com.iiitd.erp.ui.InstructorDashboardWindow;
-import com.iiitd.erp.ui.StudentDashboardWindow;
-
-
 import javax.swing.*;
 import java.awt.*;
 import java.util.Objects;
@@ -21,12 +17,14 @@ public class LoginUI extends JFrame {
     private final JLabel newUserLabel, forgotPasswordLabel, helpLabel;
 
     private final AuthClient authClient;
+    private final String baseUrl;
 
     public LoginUI() {
-        this("http://localhost:8080"); // default base URL
+        this("http://localhost:8080");
     }
 
     public LoginUI(String baseUrl) {
+        this.baseUrl = baseUrl;
         this.authClient = new AuthClient(baseUrl);
 
         setTitle("IIITD ERP Login");
@@ -158,7 +156,6 @@ public class LoginUI extends JFrame {
         footer.add(copyRight);
         add(footer, BorderLayout.SOUTH);
 
-        // ACTION LISTENER -> call backend
         loginButton.addActionListener(e -> doLogin());
     }
 
@@ -194,12 +191,14 @@ public class LoginUI extends JFrame {
         worker.execute();
     }
 
-
     private void openDashboard(LoginResult result) {
         switch (result.role().toUpperCase()) {
             case "STUDENT" -> SwingUtilities.invokeLater(() -> new StudentDashboardWindow().setVisible(true));
             case "INSTRUCTOR" -> SwingUtilities.invokeLater(() -> new InstructorDashboardWindow().setVisible(true));
-            case "ADMIN" -> SwingUtilities.invokeLater(() -> new AdminDashboardExact().setVisible(true));
+            case "ADMIN" -> SwingUtilities.invokeLater(() -> {
+                AdminClient admin = new AdminClient(baseUrl, result.cookieHeader());
+                new AdminDashboardExact(admin).setVisible(true);
+            });
             default -> JOptionPane.showMessageDialog(this,
                     "Unknown role: " + result.role(), "Login", JOptionPane.WARNING_MESSAGE);
         }
