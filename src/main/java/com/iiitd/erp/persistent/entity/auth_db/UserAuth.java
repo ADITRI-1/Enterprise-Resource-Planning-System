@@ -5,10 +5,12 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import org.hibernate.annotations.JdbcTypeCode;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.hibernate.type.SqlTypes;
 
 import java.time.OffsetDateTime;
 import java.util.UUID;
@@ -39,6 +41,7 @@ public class UserAuth {
     @Column(name = "last_login")
     private OffsetDateTime lastLogin;
 
+    @JdbcTypeCode(SqlTypes.JSON)
     @Column(name = "password_history", columnDefinition = "jsonb")
     private String passwordHistory;
 

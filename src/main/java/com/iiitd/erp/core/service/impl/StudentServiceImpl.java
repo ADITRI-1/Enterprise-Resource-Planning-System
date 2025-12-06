@@ -59,6 +59,7 @@ public class StudentServiceImpl implements StudentService {
             String passwordHash = passwordEncoder.encode(rawPassword);
 
             userAuthPersistPort.save(UserAuthDomain.builder()
+                            .userId(userId)
                     .username(username)
                     .role("student")
                     .passwordHash(passwordHash)
@@ -66,7 +67,7 @@ public class StudentServiceImpl implements StudentService {
                     .active(true)
                     .build());
 
-            studentPersistPort.saveStudent(studentDomain);
+            studentPersistPort.saveStudent(studentDomain.withStudentId(userId));
 
             LOGGER.info("Successfully created student user {} for roll {}", username, rollNo);
 
