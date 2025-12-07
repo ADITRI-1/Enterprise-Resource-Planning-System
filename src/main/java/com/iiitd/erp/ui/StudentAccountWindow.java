@@ -7,12 +7,14 @@ import com.iiitd.erp.ui.client.AdminClient;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
-import java.awt.event.*;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.util.List;
 
 public class StudentAccountWindow extends JFrame {
 
     private final AdminClient admin;
+    private final JFrame parent;
     private JTextField fullName;
     private JTextField rollNo;
     private JComboBox<String> program;
@@ -20,10 +22,11 @@ public class StudentAccountWindow extends JFrame {
     private JTextField year;
     private JButton createBtn;
 
-    public StudentAccountWindow() { this(null); }
+    public StudentAccountWindow() { this(null, null); }
 
-    public StudentAccountWindow(AdminClient admin) {
+    public StudentAccountWindow(AdminClient admin, JFrame parent) {
         this.admin = admin;
+        this.parent = parent;
 
         setTitle("Create Student Account");
         setSize(1280, 780);
@@ -41,7 +44,6 @@ public class StudentAccountWindow extends JFrame {
         main.add(new SlidingPanel(new LeftRail()), BorderLayout.WEST);
         main.add(new ContentArea(), BorderLayout.CENTER);
 
-        // populate programs from backend
         loadPrograms();
     }
 
@@ -151,6 +153,8 @@ public class StudentAccountWindow extends JFrame {
             nav.add(navButton("Create Courses", '\uE8F1'));
             nav.add(Box.createVerticalStrut(20));
             nav.add(navButton("Create Sections", '\uE8FD'));
+            nav.add(Box.createVerticalStrut(20));
+            nav.add(navButton("Manage Users", '\uE77B'));
             add(margin(nav, 10, 20, 10, 20), BorderLayout.CENTER);
         }
         private JPanel navButton(String text, char icon) {
@@ -192,61 +196,61 @@ public class StudentAccountWindow extends JFrame {
             box.setLayout(new BoxLayout(box, BoxLayout.Y_AXIS));
             box.setBorder(new EmptyBorder(40, 100, 40, 100));
 
+            JPanel topBar = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
+            topBar.setOpaque(false);
+            JButton backBtn = new JButton("Back");
+            JButton logoutBtn = new JButton("Logout");
+            backBtn.addActionListener(e -> {
+                dispose();
+                if (parent != null) parent.setVisible(true);
+            });
+            logoutBtn.addActionListener(e -> {
+                if (parent != null) parent.dispose();
+                dispose();
+                new LoginUI().setVisible(true);
+            });
+            topBar.add(backBtn); topBar.add(logoutBtn);
+            topBar.setAlignmentX(Component.LEFT_ALIGNMENT);
+            box.add(topBar);
+            box.add(Box.createVerticalStrut(10));
+
             JLabel title = new JLabel("CREATE STUDENT ACCOUNT");
             title.setFont(new Font("Segoe UI", Font.BOLD, 36));
             title.setForeground(new Color(30, 40, 60));
             title.setAlignmentX(Component.LEFT_ALIGNMENT);
             box.add(title);
 
-            box.add(Box.createVerticalStrut(25));
-
-            JPanel form = new JPanel();
-            form.setOpaque(false);
-            form.setLayout(new GridBagLayout());
-            GridBagConstraints gbc = new GridBagConstraints();
-            gbc.insets = new Insets(10, 10, 10, 10);
-            gbc.anchor = GridBagConstraints.WEST;
-
-            int fieldWidth = 380;
-            int fieldHeight = 36;
-
-            fullName = new JTextField();
-            fullName.setPreferredSize(new Dimension(fieldWidth, fieldHeight));
-
-            rollNo = new JTextField();
-            rollNo.setPreferredSize(new Dimension(fieldWidth, fieldHeight));
-
-            program = new JComboBox<>(new String[]{"Loading..."}); // will be populated
-            program.setPreferredSize(new Dimension(fieldWidth, fieldHeight));
-
-            dob = new JTextField("DD-MM-YYYY");
-            dob.setPreferredSize(new Dimension(fieldWidth, fieldHeight));
-
-            year = new JTextField("2024");
-            year.setPreferredSize(new Dimension(fieldWidth, fieldHeight));
-
-            addRow(form, gbc, 0, "Full Name", fullName);
-            addRow(form, gbc, 1, "Roll No", rollNo);
-            addRow(form, gbc, 2, "Program ID", program);
-            addRow(form, gbc, 3, "Date of Birth", dob);
-            addRow(form, gbc, 4, "Year of Registration", year);
-
-            box.add(form);
-
             box.add(Box.createVerticalStrut(30));
 
+            JPanel form = new JPanel(new GridBagLayout());
+            form.setOpaque(false);
+            GridBagConstraints gbc = new GridBagConstraints();
+            gbc.insets = new Insets(12, 12, 12, 12);
+            gbc.anchor = GridBagConstraints.WEST;
+            gbc.fill = GridBagConstraints.HORIZONTAL;
+
+            fullName = new JTextField(20); fullName.setFont(new Font("Segoe UI", Font.PLAIN, 18));
+            rollNo = new JTextField(20); rollNo.setFont(new Font("Segoe UI", Font.PLAIN, 18));
+            program = new JComboBox<>(); program.setFont(new Font("Segoe UI", Font.PLAIN, 18));
+            dob = new JTextField("DD-MM-YYYY", 20); dob.setFont(new Font("Segoe UI", Font.PLAIN, 18));
+            year = new JTextField(20); year.setFont(new Font("Segoe UI", Font.PLAIN, 18));
             createBtn = new JButton("Create Student Account");
             createBtn.setFont(new Font("Segoe UI", Font.BOLD, 20));
+            createBtn.setBackground(new Color(43, 123, 196));
             createBtn.setForeground(Color.WHITE);
-            createBtn.setBackground(new Color(29, 85, 180));
             createBtn.setFocusPainted(false);
-            createBtn.setBorder(new EmptyBorder(12, 40, 12, 40));
 
-            JPanel btnPanel = new JPanel();
-            btnPanel.setOpaque(false);
-            btnPanel.add(createBtn);
+            addRow(form, gbc, 0, "Full Name", fullName);
+            addRow(form, gbc, 1, "Roll Number", rollNo);
+            addRow(form, gbc, 2, "Program ID", program);
+            addRow(form, gbc, 3, "Date of Birth (DD-MM-YYYY)", dob);
+            addRow(form, gbc, 4, "Year of Registration", year);
 
-            box.add(btnPanel);
+            gbc.gridx = 0; gbc.gridy = 5; gbc.gridwidth = 2;
+            gbc.fill = GridBagConstraints.NONE; gbc.anchor = GridBagConstraints.CENTER;
+            form.add(createBtn, gbc);
+
+            box.add(form);
 
             add(box, BorderLayout.CENTER);
 
@@ -254,7 +258,8 @@ public class StudentAccountWindow extends JFrame {
         }
 
         private void addRow(JPanel p, GridBagConstraints gbc, int row, String label, JComponent field) {
-            gbc.gridx = 0; gbc.gridy = row; p.add(new JLabel(label + "  "), gbc);
+            gbc.gridx = 0; gbc.gridy = row; gbc.gridwidth = 1; gbc.fill = GridBagConstraints.HORIZONTAL;
+            p.add(new JLabel(label + "  "), gbc);
             gbc.gridx = 1; p.add(field, gbc);
         }
     }
@@ -279,25 +284,17 @@ public class StudentAccountWindow extends JFrame {
             System.out.println("loadPrograms skipped: admin null");
             return;
         }
-        System.out.println("Loading programs from backend...");
         SwingWorker<Void, Void> w = new SwingWorker<>() {
             List<ProgramResponse> programs;
             @Override protected Void doInBackground() {
                 try { programs = admin.listPrograms(); }
-                catch (Exception ex) {
-                    System.out.println("loadPrograms error: " + ex.getMessage());
-                    ex.printStackTrace();
-                }
+                catch (Exception ex) { ex.printStackTrace(); }
                 return null;
             }
             @Override protected void done() {
-                if (programs == null || programs.isEmpty()) {
-                    System.out.println("loadPrograms: no programs fetched");
-                    return;
-                }
+                if (programs == null || programs.isEmpty()) return;
                 program.removeAllItems();
                 programs.forEach(p -> program.addItem(p.programId()));
-                System.out.println("loadPrograms: loaded " + programs.size() + " programs");
             }
         };
         w.execute();
@@ -307,22 +304,18 @@ public class StudentAccountWindow extends JFrame {
     private void doCreateStudent() {
         if (admin == null) {
             JOptionPane.showMessageDialog(this, "No admin session. Please log in as admin.", "Error", JOptionPane.ERROR_MESSAGE);
-            System.out.println("CreateStudent aborted: admin null");
             return;
         }
         String dobText = dob.getText().trim();
         if (!dobText.matches("\\d{2}-\\d{2}-\\d{4}")) {
             JOptionPane.showMessageDialog(this, "Use DOB format DD-MM-YYYY", "Error", JOptionPane.ERROR_MESSAGE);
-            System.out.println("CreateStudent aborted: bad DOB format " + dobText);
             return;
         }
         if (program.getSelectedItem() == null) {
             JOptionPane.showMessageDialog(this, "Select a program", "Error", JOptionPane.ERROR_MESSAGE);
-            System.out.println("CreateStudent aborted: no program selected");
             return;
         }
         String prog = program.getSelectedItem().toString();
-        System.out.println("CreateStudent calling API roll=" + rollNo.getText() + " program=" + prog + " dob=" + dobText);
         createBtn.setEnabled(false);
         SwingWorker<Void, Void> worker = new SwingWorker<>() {
             @Override protected Void doInBackground() {
@@ -335,11 +328,8 @@ public class StudentAccountWindow extends JFrame {
                             .yearOfRegistration(year.getText().trim())
                             .build();
                     admin.createStudent(req);
-                    System.out.println("CreateStudent success");
                     JOptionPane.showMessageDialog(StudentAccountWindow.this, "Student created successfully", "Success", JOptionPane.INFORMATION_MESSAGE);
                 } catch (Exception ex) {
-                    System.out.println("CreateStudent error: " + ex.getMessage());
-                    ex.printStackTrace();
                     JOptionPane.showMessageDialog(StudentAccountWindow.this, "Error: " + ex.getMessage(), "Failed", JOptionPane.ERROR_MESSAGE);
                 }
                 return null;

@@ -1,9 +1,11 @@
-// src/main/java/com/iiitd/erp/io/dto/request/SectionUpdateRequest.java
 package com.iiitd.erp.io.dto.request;
 
 import jakarta.validation.constraints.*;
+import lombok.Builder;
+
 import java.time.LocalDate;
 
+@Builder
 public record SectionUpdateRequest(
         @NotBlank String instructorCode,
         @NotBlank String semester,
@@ -11,4 +13,5 @@ public record SectionUpdateRequest(
         @Positive int capacity,
         @NotNull LocalDate registrationDeadline,
         @NotNull Boolean active
-) {}
+) {
+}

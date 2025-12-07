@@ -115,6 +115,9 @@ public class AdminClient {
     }
 
     // Sections
+    public List<SectionResponse> listSections() throws IOException {
+        return send("GET", "/api/admin/sections", null, new TypeReference<>() {});
+    }
     public List<SectionResponse> listSectionsForCourse(String courseId, String semester, Integer year) throws IOException {
         String q = "";
         if (semester != null) q += (q.isEmpty() ? "?" : "&") + "semester=" + semester;

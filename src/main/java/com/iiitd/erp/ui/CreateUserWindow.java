@@ -8,11 +8,13 @@ import javax.swing.border.EmptyBorder;
 public class CreateUserWindow extends JFrame {
 
     private final AdminClient admin;
+    private final JFrame parent;
 
-    public CreateUserWindow() { this(null); }
+    public CreateUserWindow() { this(null, null); }
 
-    public CreateUserWindow(AdminClient admin) {
+    public CreateUserWindow(AdminClient admin, JFrame parent) {
         this.admin = admin;
+        this.parent = parent;
 
         setTitle("Create User");
         setSize(700, 420);
@@ -46,6 +48,22 @@ public class CreateUserWindow extends JFrame {
         center.setBackground(Color.WHITE);
         center.setLayout(new BoxLayout(center, BoxLayout.Y_AXIS));
 
+        JPanel topBar = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 0));
+        topBar.setOpaque(false);
+        JButton back = new JButton("Back");
+        back.addActionListener(e -> {
+            dispose();
+            if (parent != null) parent.setVisible(true);
+        });
+        JButton logout = new JButton("Logout");
+        logout.addActionListener(e -> {
+            if (parent != null) parent.dispose();
+            dispose();
+            new LoginUI().setVisible(true);
+        });
+        topBar.add(back); topBar.add(logout);
+        topBar.setAlignmentX(Component.CENTER_ALIGNMENT);
+
         JLabel title = new JLabel("Create User");
         title.setFont(new Font("Segoe UI", Font.BOLD, 36));
         title.setForeground(new Color(18, 40, 60));
@@ -56,15 +74,13 @@ public class CreateUserWindow extends JFrame {
         JButton instructorBtn = styledButton("Instructor");
 
         studentBtn.addActionListener(e -> {
-            System.out.println("CreateUserWindow -> StudentAccountWindow admin=" + (admin != null));
-            new StudentAccountWindow(admin).setVisible(true);
-            dispose();
+            setVisible(false);
+            new StudentAccountWindow(admin, this).setVisible(true);
         });
 
         instructorBtn.addActionListener(e -> {
-            System.out.println("CreateUserWindow -> FacultyAccountWindow admin=" + (admin != null));
-            new FacultyAccountWindow(admin).setVisible(true);
-            dispose();
+            setVisible(false);
+            new FacultyAccountWindow(admin, this).setVisible(true);
         });
 
         JPanel buttons = new JPanel();
@@ -73,6 +89,7 @@ public class CreateUserWindow extends JFrame {
         buttons.add(Box.createHorizontalStrut(40));
         buttons.add(instructorBtn);
 
+        center.add(topBar);
         center.add(title);
         center.add(buttons);
 

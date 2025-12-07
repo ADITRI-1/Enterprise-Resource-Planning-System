@@ -1,14 +1,23 @@
 package com.iiitd.erp.ui;
 
+import com.iiitd.erp.io.dto.response.StudentResponse;
+import com.iiitd.erp.ui.client.StudentClient;
+
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
 import java.awt.event.*;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public class StudentDashboardWindow extends JFrame {
 
-    public StudentDashboardWindow() {
+    private final static Logger LOGGER = Logger.getLogger(StudentDashboardWindow.class.getName());
+    private final StudentClient client;
 
+    public StudentDashboardWindow(StudentClient client) {
+        this.client = client;
+        LOGGER.info("StudentDashboardWindow initialized");
         setTitle("Student Dashboard");
         setSize(1280, 760);
         setLocationRelativeTo(null);
@@ -22,7 +31,7 @@ public class StudentDashboardWindow extends JFrame {
         main.setBackground(new Color(245, 248, 251));
         add(main, BorderLayout.CENTER);
 
-        main.add(new SlidingPanel(new LeftRail()), BorderLayout.WEST);
+        main.add(new SlidingPanel(new LeftRail(client)), BorderLayout.WEST);
         main.add(new DashboardArea(), BorderLayout.CENTER);
 
         setVisible(true);
@@ -198,8 +207,13 @@ public class StudentDashboardWindow extends JFrame {
     /* LEFT RAIL WITH AVATAR + STUDENT RIBBON + NAV BUTTONS                   */
     /* ---------------------------------------------------------------------- */
 
-    static class LeftRail extends JPanel {
-        LeftRail() {
+    class LeftRail extends JPanel {
+        private JLabel studentNameLabel;
+        private JLabel studentIdLabel;
+        private final StudentClient client;
+
+        LeftRail(StudentClient client) {
+            this.client = client;
             setOpaque(false);
             setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
 
@@ -213,15 +227,50 @@ public class StudentDashboardWindow extends JFrame {
             add(center(studentRibbon()));
             add(Box.createVerticalStrut(25));
 
-            nav("My Courses", e -> new MyCoursesWindow().setVisible(true));
-            nav("Register Courses", e -> new RegisterCoursesWindow().setVisible(true));
-            nav("My Timetable", e -> new MyTimetableWindow().setVisible(true));
-            nav("Grades", e -> new ViewGradesWindow().setVisible(true));
+            nav("My Courses", e -> {
+                LOGGER.info("Navigating to MyCoursesWindow");
+                new MyCoursesWindow(client).setVisible(true);
+            });
+            nav("Register Courses", e -> {
+                LOGGER.info("Navigating to RegisterCoursesWindow");
+                new RegisterCoursesWindow(client).setVisible(true);
+            });
+            nav("My Timetable", e -> {
+                LOGGER.info("Navigating to MyTimetableWindow");
+                new MyTimetableWindow(client).setVisible(true);
+            });
+            nav("Grades", e -> {
+                LOGGER.info("Navigating to ViewGradesWindow");
+                new ViewGradesWindow(client).setVisible(true);
+            });
 
             add(Box.createVerticalGlue());
+            loadStudentInfo();
         }
 
-        private static JPanel center(JComponent c) {
+        private void loadStudentInfo() {
+            SwingWorker<Void, Void> w = new SwingWorker<>() {
+                StudentResponse student;
+                @Override protected Void doInBackground() {
+                    try {
+                        LOGGER.info("Loading student info");
+                        student = client.getMyInfo();
+                    } catch (Exception e) {
+                        LOGGER.log(Level.SEVERE, "Failed to load student info", e);
+                    }
+                    return null;
+                }
+                @Override protected void done() {
+                    if (student != null) {
+                        studentNameLabel.setText(student.name());
+                        studentIdLabel.setText("ID: " + student.rollNo());
+                    }
+                }
+            };
+            w.execute();
+        }
+
+        private JPanel center(JComponent c) {
             JPanel p = new JPanel();
             p.setOpaque(false);
             p.add(c);
@@ -234,14 +283,14 @@ public class StudentDashboardWindow extends JFrame {
             p.setBorder(new EmptyBorder(8, 18, 8, 18));
             p.setLayout(new BoxLayout(p, BoxLayout.Y_AXIS));
 
-            JLabel name = new JLabel("Student Name");
-            name.setFont(new Font("Segoe UI", Font.BOLD, 17));
+            studentNameLabel = new JLabel("Student Name");
+            studentNameLabel.setFont(new Font("Segoe UI", Font.BOLD, 17));
 
-            JLabel id = new JLabel("ID: STU12345");
-            id.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+            studentIdLabel = new JLabel("ID: STU12345");
+            studentIdLabel.setFont(new Font("Segoe UI", Font.PLAIN, 14));
 
-            p.add(name);
-            p.add(id);
+            p.add(studentNameLabel);
+            p.add(studentIdLabel);
 
             return p;
         }
@@ -300,7 +349,7 @@ public class StudentDashboardWindow extends JFrame {
     /* DASHBOARD CENTER AREA (Blue cards instead of white)                    */
     /* ---------------------------------------------------------------------- */
 
-    static class DashboardArea extends JPanel {
+    class DashboardArea extends JPanel {
 
         DashboardArea() {
 
@@ -320,20 +369,32 @@ public class StudentDashboardWindow extends JFrame {
             row1.setLayout(new FlowLayout(FlowLayout.CENTER, 40, 20));
 
             row1.add(card("MY COURSES", "View registered courses",
-                    () -> new MyCoursesWindow().setVisible(true)));
+                    () -> {
+                        LOGGER.info("Navigating to MyCoursesWindow");
+                        new MyCoursesWindow(client).setVisible(true);
+                    }));
 
             row1.add(card("REGISTER COURSES", "Browse and add courses",
-                    () -> new RegisterCoursesWindow().setVisible(true)));
+                    () -> {
+                        LOGGER.info("Navigating to RegisterCoursesWindow");
+                        new RegisterCoursesWindow(client).setVisible(true);
+                    }));
 
             JPanel row2 = new JPanel();
             row2.setOpaque(false);
             row2.setLayout(new FlowLayout(FlowLayout.CENTER, 40, 20));
 
             row2.add(card("MY TIMETABLE", "View weekly schedule",
-                    () -> new MyTimetableWindow().setVisible(true)));
+                    () -> {
+                        LOGGER.info("Navigating to MyTimetableWindow");
+                        new MyTimetableWindow(client).setVisible(true);
+                    }));
 
             row2.add(card("GRADES", "Check your performance",
-                    () -> new ViewGradesWindow().setVisible(true)));
+                    () -> {
+                        LOGGER.info("Navigating to ViewGradesWindow");
+                        new ViewGradesWindow(client).setVisible(true);
+                    }));
 
             add(row1);
             add(row2);
@@ -408,7 +469,6 @@ public class StudentDashboardWindow extends JFrame {
         }
     }
     public static void main(String[] args) {
-        SwingUtilities.invokeLater(() -> new StudentDashboardWindow().setVisible(true));
+        SwingUtilities.invokeLater(() -> new StudentDashboardWindow(null).setVisible(true));
     }
 }
-

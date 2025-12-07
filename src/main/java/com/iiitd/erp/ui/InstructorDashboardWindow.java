@@ -1,17 +1,25 @@
 package com.iiitd.erp.ui;
 
+import com.iiitd.erp.ui.client.InstructorClient;
+
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
 import java.awt.event.*;
+import java.util.logging.Logger;
 
 public class InstructorDashboardWindow extends JFrame {
 
+    private final static Logger LOGGER = Logger.getLogger(InstructorDashboardWindow.class.getName());
+    private final InstructorClient client;
+
     public static void main(String[] args) {
-        SwingUtilities.invokeLater(() -> new InstructorDashboardWindow().setVisible(true));
+        SwingUtilities.invokeLater(() -> new InstructorDashboardWindow(null).setVisible(true));
     }
 
-    public InstructorDashboardWindow() {
+    public InstructorDashboardWindow(InstructorClient client) {
+        this.client = client;
+        LOGGER.info("InstructorDashboardWindow initialized");
         setTitle("IIITD Instructor Dashboard");
         setSize(1250, 750);
         setLocationRelativeTo(null);
@@ -25,7 +33,7 @@ public class InstructorDashboardWindow extends JFrame {
         main.setBackground(new Color(245, 248, 251));
         add(main, BorderLayout.CENTER);
 
-        main.add(new SlidingPanel(new LeftRail()), BorderLayout.WEST);
+        main.add(new SlidingPanel(new LeftRail(client)), BorderLayout.WEST);
         main.add(new ContentArea(), BorderLayout.CENTER);
     }
 
@@ -170,29 +178,40 @@ public class InstructorDashboardWindow extends JFrame {
     }
 
     /* ------------ LEFT RAIL ------------ */
-    static class LeftRail extends JPanel {
+    class LeftRail extends JPanel {
 
-        LeftRail() {
+        private final InstructorClient client;
+
+        LeftRail(InstructorClient client) {
+            this.client = client;
             setOpaque(false);
             setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
             add(Box.createVerticalStrut(18));
             add(pad(instructorCard(), 16, 16, 6, 16));
             add(Box.createVerticalStrut(12));
 
-            add(pad(nav("Course Sections",
-                    e -> new InstructorCourseSectionsWindow().setVisible(true)), 0, 16, 0, 16));
+            add(pad(nav("Course Sections", e -> {
+                LOGGER.info("Navigating to InstructorCourseSectionsWindow");
+                new InstructorCourseSectionsWindow(client).setVisible(true);
+            }), 0, 16, 0, 16));
             add(Box.createVerticalStrut(10));
 
-            add(pad(nav("Enter Scores",
-                    e -> new InstructorEnterScoresWindow().setVisible(true)), 0, 16, 0, 16));
+            add(pad(nav("Enter Scores", e -> {
+                LOGGER.info("Navigating to InstructorEnterScoresWindow");
+                new InstructorEnterScoresWindow(client).setVisible(true);
+            }), 0, 16, 0, 16));
             add(Box.createVerticalStrut(10));
 
-            add(pad(nav("Compute Grades",
-                    e -> new InstructorComputeGradesWindow().setVisible(true)), 0, 16, 0, 16));
+            add(pad(nav("Compute Grades", e -> {
+                LOGGER.info("Navigating to InstructorComputeGradesWindow");
+                new InstructorComputeGradesWindow().setVisible(true);
+            }), 0, 16, 0, 16));
             add(Box.createVerticalStrut(10));
 
-            add(pad(nav("View Statistics",
-                    e -> new InstructorViewStatsWindow().setVisible(true)), 0, 16, 0, 16));
+            add(pad(nav("View Statistics", e -> {
+                LOGGER.info("Navigating to InstructorViewStatsWindow");
+                new InstructorViewStatsWindow().setVisible(true);
+            }), 0, 16, 0, 16));
 
             add(Box.createVerticalGlue());
         }
@@ -237,7 +256,7 @@ public class InstructorDashboardWindow extends JFrame {
             return b;
         }
 
-        private static JPanel pad(JComponent c, int t, int l, int b, int r) {
+        private JPanel pad(JComponent c, int t, int l, int b, int r) {
             JPanel p = new JPanel(new BorderLayout());
             p.setOpaque(false);
             p.setBorder(new EmptyBorder(t, l, b, r));
@@ -284,7 +303,7 @@ public class InstructorDashboardWindow extends JFrame {
     }
 
     /* ------------ DASHBOARD CONTENT ------------ */
-    static class ContentArea extends JPanel {
+    class ContentArea extends JPanel {
         ContentArea() {
             setOpaque(false);
             setLayout(new BorderLayout());
@@ -314,27 +333,39 @@ public class InstructorDashboardWindow extends JFrame {
             gbc.gridx = 0; gbc.gridy = 0;
             grid.add(card("COURSE SECTIONS", "Manage your class sections",
                     "View Sections", blue,
-                    e -> new InstructorCourseSectionsWindow().setVisible(true)), gbc);
+                    e -> {
+                        LOGGER.info("Navigating to InstructorCourseSectionsWindow");
+                        new InstructorCourseSectionsWindow(client).setVisible(true);
+                    }), gbc);
 
             gbc.gridx = 1; gbc.gridy = 0;
             grid.add(card("ENTER SCORES", "Enter assignment / exam marks",
                     "Go to Gradebook", blue,
-                    e -> new InstructorEnterScoresWindow().setVisible(true)), gbc);
+                    e -> {
+                        LOGGER.info("Navigating to InstructorEnterScoresWindow");
+                        new InstructorEnterScoresWindow(client).setVisible(true);
+                    }), gbc);
 
             gbc.gridx = 0; gbc.gridy = 1;
             grid.add(card("COMPUTE GRADES", "Compute final grades",
                     "Finalize Grades", blue,
-                    e -> new InstructorComputeGradesWindow().setVisible(true)), gbc);
+                    e -> {
+                        LOGGER.info("Navigating to InstructorComputeGradesWindow");
+                        new InstructorComputeGradesWindow().setVisible(true);
+                    }), gbc);
 
             gbc.gridx = 1; gbc.gridy = 1;
             grid.add(card("VIEW STATISTICS", "Analyze class performance",
                     "Access Reports", blue,
-                    e -> new InstructorViewStatsWindow().setVisible(true)), gbc);
+                    e -> {
+                        LOGGER.info("Navigating to InstructorViewStatsWindow");
+                        new InstructorViewStatsWindow().setVisible(true);
+                    }), gbc);
 
             add(margin(grid, 0, 18, 18, 24), BorderLayout.CENTER);
         }
 
-        private static JPanel card(String title, String subtitle,
+        private JPanel card(String title, String subtitle,
                                    String buttonText, Color blue, ActionListener al) {
             JPanel card = new JPanel() {
                 @Override protected void paintComponent(Graphics g) {
@@ -384,7 +415,7 @@ public class InstructorDashboardWindow extends JFrame {
             return card;
         }
 
-        private static JPanel margin(JComponent c, int t, int l, int b, int r) {
+        private JPanel margin(JComponent c, int t, int l, int b, int r) {
             JPanel p = new JPanel(new BorderLayout());
             p.setOpaque(false);
             p.setBorder(new EmptyBorder(t, l, b, r));

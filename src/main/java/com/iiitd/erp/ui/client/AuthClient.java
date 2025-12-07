@@ -23,14 +23,14 @@ public class AuthClient {
         this.baseUrl = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
     }
 
-    public LoginResult login(String username, String password) throws IOException {
+    public LoginResult login(String username, String password, String role) throws IOException {
         URL url = new URL(baseUrl + "/api/auth/login");
         HttpURLConnection conn = (HttpURLConnection) url.openConnection();
         conn.setRequestMethod("POST");
         conn.setRequestProperty("Content-Type", "application/json");
         conn.setDoOutput(true);
 
-        String payload = mapper.writeValueAsString(new LoginRequest(username, password));
+        String payload = mapper.writeValueAsString(new LoginRequest(username, password, role));
         try (OutputStream os = conn.getOutputStream()) {
             os.write(payload.getBytes(StandardCharsets.UTF_8));
         }
@@ -67,7 +67,7 @@ public class AuthClient {
     }
 
     // DTOs for deserialization
-    private record LoginRequest(String username, String password) {}
+    private record LoginRequest(String username, String password, String role) {}
     private record LoginResponse(String message, String username, String role, String sessionId) {}
     private record ApiError(String errorCode, String message) {}
 

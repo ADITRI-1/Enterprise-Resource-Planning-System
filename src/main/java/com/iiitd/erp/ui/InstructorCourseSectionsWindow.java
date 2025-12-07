@@ -1,82 +1,111 @@
 package com.iiitd.erp.ui;
 
+import com.iiitd.erp.io.dto.response.CourseResponse;
+import com.iiitd.erp.io.dto.response.SectionResponse;
+import com.iiitd.erp.ui.client.InstructorClient;
+
 import javax.swing.*;
-import javax.swing.border.EmptyBorder;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
-import java.awt.event.*;
+import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public class InstructorCourseSectionsWindow extends JFrame {
 
-    public static void main(String[] args) {
-        SwingUtilities.invokeLater(() -> new InstructorCourseSectionsWindow().setVisible(true));
-    }
+    private final InstructorClient client;
+    private JTable courseTable, sectionTable;
+    private final static Logger LOGGER = Logger.getLogger(InstructorCourseSectionsWindow.class.getName());
 
-    public InstructorCourseSectionsWindow() {
-        setTitle("Course Sections");
-        setSize(1150, 720);
+    public InstructorCourseSectionsWindow(InstructorClient client) {
+        this.client = client;
+        LOGGER.info("InstructorCourseSectionsWindow initialized");
+
+        setTitle("My Course Sections");
+        setSize(1200, 750);
         setLocationRelativeTo(null);
         setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
         setLayout(new BorderLayout());
 
-        add(new InstructorDashboardWindow.HeaderBar(), BorderLayout.NORTH);
-        add(new InstructorDashboardWindow.FooterBar(), BorderLayout.SOUTH);
+        JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, coursePanel(), sectionPanel());
+        splitPane.setDividerLocation(400);
+        add(splitPane, BorderLayout.CENTER);
 
-        JPanel main = new JPanel(new BorderLayout());
-        main.setBackground(new Color(245, 248, 251));
-        add(main, BorderLayout.CENTER);
-
-        main.add(new InstructorDashboardWindow.SlidingPanel(new InstructorDashboardWindow.LeftRail()),
-                BorderLayout.WEST);
-        main.add(centerContent(), BorderLayout.CENTER);
+        loadCourses();
     }
 
-    private JComponent centerContent() {
+    private JPanel coursePanel() {
         JPanel p = new JPanel(new BorderLayout());
-        p.setOpaque(false);
-
-        JLabel title = new JLabel("COURSE SECTIONS");
-        title.setFont(new Font("Segoe UI", Font.BOLD, 34));
-        title.setBorder(new EmptyBorder(20, 24, 10, 0));
-        p.add(title, BorderLayout.NORTH);
-
-        String[] cols = {"Course Code", "Title", "Section", "Capacity", "Enrolled", "Schedule"};
-        Object[][] data = {
-                {"CSE201", "Data Structures", "A", "80", "76", "Mon/Wed 10–11"},
-                {"CSE201", "Data Structures", "B", "80", "70", "Tue/Thu 12–1"},
-                {"CSE301", "Algorithms", "A", "70", "68", "Mon/Wed 2–3"}
-        };
-
-        DefaultTableModel model = new DefaultTableModel(data, cols) {
-            @Override public boolean isCellEditable(int r, int c) { return false; }
-        };
-
-        JTable table = new JTable(model);
-        table.setFont(new Font("Segoe UI", Font.PLAIN, 17));
-        table.setRowHeight(30);
-        table.getTableHeader().setFont(new Font("Segoe UI", Font.BOLD, 17));
-
-        JScrollPane sp = new JScrollPane(table);
-        sp.setBorder(new EmptyBorder(10, 24, 10, 24));
-        p.add(sp, BorderLayout.CENTER);
-
-        JButton add = new JButton("Add Section");
-        JButton edit = new JButton("Edit Section");
-        JButton delete = new JButton("Remove Section");
-        JButton[] btns = {add, edit, delete};
-        for (JButton b : btns) {
-            b.setBackground(new Color(43,123,196));
-            b.setForeground(Color.WHITE);
-            b.setFocusPainted(false);
-        }
-
-        JPanel bottom = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 10));
-        bottom.setOpaque(false);
-        bottom.add(add);
-        bottom.add(edit);
-        bottom.add(delete);
-        p.add(bottom, BorderLayout.SOUTH);
-
+        courseTable = new JTable(new DefaultTableModel(new Object[]{"Course ID", "Title"}, 0));
+        courseTable.getSelectionModel().addListSelectionListener(e -> {
+            if (!e.getValueIsAdjusting()) {
+                int selectedRow = courseTable.getSelectedRow();
+                if (selectedRow != -1) {
+                    String courseId = courseTable.getValueAt(selectedRow, 0).toString();
+                    loadSections(courseId);
+                }
+            }
+        });
+        p.add(new JScrollPane(courseTable), BorderLayout.CENTER);
         return p;
+    }
+
+    private JPanel sectionPanel() {
+        JPanel p = new JPanel(new BorderLayout());
+        sectionTable = new JTable(new DefaultTableModel(new Object[]{"Section ID", "Semester", "Year", "Capacity"}, 0));
+        p.add(new JScrollPane(sectionTable), BorderLayout.CENTER);
+        return p;
+    }
+
+    private void loadCourses() {
+        SwingWorker<Void, Void> w = new SwingWorker<>() {
+            List<CourseResponse> courses;
+            @Override protected Void doInBackground() {
+                try {
+                    LOGGER.info("Loading instructor courses");
+                    courses = client.getMyCourses();
+                } catch (Exception e) {
+                    LOGGER.log(Level.SEVERE, "Failed to load instructor courses", e);
+                    JOptionPane.showMessageDialog(InstructorCourseSectionsWindow.this, "Error loading courses: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+                }
+                return null;
+            }
+            @Override protected void done() {
+                DefaultTableModel m = (DefaultTableModel) courseTable.getModel();
+                m.setRowCount(0);
+                if (courses != null) {
+                    for (CourseResponse course : courses) {
+                        m.addRow(new Object[]{course.courseId(), course.title()});
+                    }
+                }
+            }
+        };
+        w.execute();
+    }
+
+    private void loadSections(String courseId) {
+        SwingWorker<Void, Void> w = new SwingWorker<>() {
+            List<SectionResponse> sections;
+            @Override protected Void doInBackground() {
+                try {
+                    LOGGER.info("Loading sections for course: " + courseId);
+                    sections = client.getMySections(courseId);
+                } catch (Exception e) {
+                    LOGGER.log(Level.SEVERE, "Failed to load sections for course " + courseId, e);
+                    JOptionPane.showMessageDialog(InstructorCourseSectionsWindow.this, "Error loading sections: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+                }
+                return null;
+            }
+            @Override protected void done() {
+                DefaultTableModel m = (DefaultTableModel) sectionTable.getModel();
+                m.setRowCount(0);
+                if (sections != null) {
+                    for (SectionResponse section : sections) {
+                        m.addRow(new Object[]{section.sectionId(), section.semester(), section.year(), section.capacity()});
+                    }
+                }
+            }
+        };
+        w.execute();
     }
 }

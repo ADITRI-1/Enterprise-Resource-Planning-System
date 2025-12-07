@@ -1,5 +1,7 @@
 package com.iiitd.erp.ui;
 
+import com.iiitd.erp.ui.client.InstructorClient;
+
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import javax.swing.table.AbstractTableModel;
@@ -19,6 +21,7 @@ import java.util.Map;
  */
 public class InstructorEnterScoresWindow extends JFrame {
 
+    private final InstructorClient client;
     // ---- top-level combos and cards ----
     private JComboBox<String> courseCombo;
     private JComboBox<String> componentCombo;
@@ -38,10 +41,11 @@ public class InstructorEnterScoresWindow extends JFrame {
     private final Map<String, ScoresTableModel> courseModels = new HashMap<>();
 
     public static void main(String[] args) {
-        SwingUtilities.invokeLater(() -> new InstructorEnterScoresWindow().setVisible(true));
+        SwingUtilities.invokeLater(() -> new InstructorEnterScoresWindow(null).setVisible(true));
     }
 
-    public InstructorEnterScoresWindow() {
+    public InstructorEnterScoresWindow(InstructorClient client) {
+        this.client = client;
         setTitle("Enter Scores");
         setSize(1250, 760);
         setLocationRelativeTo(null);
@@ -62,7 +66,7 @@ public class InstructorEnterScoresWindow extends JFrame {
         main.setBackground(new Color(245, 248, 251));
         add(main, BorderLayout.CENTER);
 
-        main.add(new SlidingPanel(new LeftRail()), BorderLayout.WEST);
+        main.add(new SlidingPanel(new LeftRail(client)), BorderLayout.WEST);
         main.add(buildContent(), BorderLayout.CENTER);
     }
 
@@ -419,15 +423,17 @@ public class InstructorEnterScoresWindow extends JFrame {
        LEFT RAIL (simple, no external dependencies)
        ============================================================ */
     static class LeftRail extends JPanel {
-        LeftRail() {
+        private final InstructorClient client;
+        LeftRail(InstructorClient client) {
+            this.client = client;
             setOpaque(false);
             setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
             add(Box.createVerticalStrut(18));
             add(pad(studentCard(), 16, 16, 10, 16));
             add(Box.createVerticalStrut(10));
-            add(pad(navButton("Course Sections"), 0, 16, 0, 16));
+            add(pad(navButton("Course Sections", e -> new InstructorCourseSectionsWindow(client).setVisible(true)), 0, 16, 0, 16));
             add(Box.createVerticalStrut(10));
-            add(pad(navButton("Enter Scores"), 0, 16, 0, 16));
+            add(pad(navButton("Enter Scores", e -> new InstructorEnterScoresWindow(client).setVisible(true)), 0, 16, 0, 16));
             add(Box.createVerticalGlue());
         }
 
@@ -478,7 +484,7 @@ public class InstructorEnterScoresWindow extends JFrame {
             return card;
         }
 
-        private static JButton navButton(String text) {
+        private static JButton navButton(String text, ActionListener al) {
             JButton b = new JButton(text);
             b.setFont(new Font("Segoe UI", Font.PLAIN, 17));
             b.setBackground(Color.WHITE);
@@ -487,10 +493,7 @@ public class InstructorEnterScoresWindow extends JFrame {
                     BorderFactory.createLineBorder(new Color(223, 228, 234)),
                     new EmptyBorder(10, 14, 10, 14)));
             b.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
-            b.addActionListener(e ->
-                    JOptionPane.showMessageDialog(b,
-                            "Navigation for \"" + text + "\" can be wired later.",
-                            "Info", JOptionPane.INFORMATION_MESSAGE));
+            b.addActionListener(al);
             return b;
         }
 

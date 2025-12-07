@@ -1,16 +1,24 @@
 package com.iiitd.erp.ui;
 
 import com.iiitd.erp.io.dto.request.SectionCreateRequest;
+import com.iiitd.erp.io.dto.response.CourseResponse;
+import com.iiitd.erp.io.dto.response.InstructorResponse;
 import com.iiitd.erp.ui.client.AdminClient;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
 import java.awt.event.*;
 import java.time.LocalDate;
+import java.util.List;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public class CreateSectionWindow extends JFrame {
 
     private final AdminClient admin;
+    private final static Logger LOGGER = Logger.getLogger(CreateSectionWindow.class.getName());
+    private Timer sidebarAnimator;
+
 
     public static void main(String[] args) { SwingUtilities.invokeLater(CreateSectionWindow::new); }
 
@@ -18,6 +26,7 @@ public class CreateSectionWindow extends JFrame {
 
     public CreateSectionWindow(AdminClient admin) {
         this.admin = admin;
+        LOGGER.info("CreateSectionWindow initialized");
 
         setTitle("Create Section");
         setSize(1250, 760);
@@ -58,7 +67,7 @@ public class CreateSectionWindow extends JFrame {
         }
     }
 
-    static class SlidingPanel extends JPanel {
+    class SlidingPanel extends JPanel {
         private final JPanel content;
         private final Arrow arrow;
         private boolean expanded = false;
@@ -71,13 +80,47 @@ public class CreateSectionWindow extends JFrame {
             add(arrow); add(content);
             MouseAdapter listener = new MouseAdapter() {
                 @Override public void mouseEntered(MouseEvent e) { expand(); }
-                @Override public void mouseExited(MouseEvent e) { collapse(); }
+                @Override public void mouseExited(MouseEvent e) {
+                    Point p = e.getPoint();
+                    if (p.x > content.getWidth()) {
+                        collapse();
+                    }
+                }
             };
             arrow.addMouseListener(listener); content.addMouseListener(listener); this.addMouseListener(listener);
         }
 
-        private void expand() { if (expanded) return; expanded = true; arrow.setExpanded(true); setPreferredSize(new Dimension(FULL, getHeight())); revalidate(); repaint(); }
-        private void collapse() { if (!expanded) return; expanded = false; arrow.setExpanded(false); setPreferredSize(new Dimension(COLLAPSED, getHeight())); revalidate(); repaint(); }
+        private void expand() {
+            if (expanded) return;
+            expanded = true;
+            arrow.setExpanded(true);
+            animate(COLLAPSED, FULL);
+        }
+
+        private void collapse() {
+            if (!expanded) return;
+            expanded = false;
+            arrow.setExpanded(false);
+            animate(FULL, COLLAPSED);
+        }
+
+        private void animate(int start, int end) {
+            if (sidebarAnimator != null && sidebarAnimator.isRunning()) {
+                sidebarAnimator.stop();
+            }
+            sidebarAnimator = new Timer(10, e -> {
+                int width = getPreferredSize().width;
+                int newWidth = width + (start < end ? 10 : -10);
+                if ((start < end && newWidth >= end) || (start > end && newWidth <= end)) {
+                    newWidth = end;
+                    ((Timer) e.getSource()).stop();
+                }
+                setPreferredSize(new Dimension(newWidth, getHeight()));
+                revalidate();
+                repaint();
+            });
+            sidebarAnimator.start();
+        }
 
         @Override public void doLayout() {
             int h = getParent().getHeight();
@@ -167,8 +210,7 @@ public class CreateSectionWindow extends JFrame {
         private static final int FIELD_WIDTH = 520;
         private static final int FIELD_HEIGHT = 36;
 
-        private JTextField courseTitle;
-        private JTextField courseCode;
+        private JComboBox<String> courseCode;
         private JComboBox<String> instructor;
         private JComboBox<String> capacity;
         private JTextField deadline;
@@ -198,13 +240,11 @@ public class CreateSectionWindow extends JFrame {
 
             int row = 0;
 
-            courseTitle = textField("");
-            courseCode = textField("");
-            instructor = comboBox("", "inst1");
-            capacity = comboBox("", "30", "60", "100");
-            deadline = textField("2024-07-31");
+            courseCode = new JComboBox<>();
+            instructor = new JComboBox<>();
+            capacity = new JComboBox<>(new String[]{"30", "60", "100"});
+            deadline = new JTextField("2024-07-31");
 
-            addRow(form, gbc, row++, "Course Title", courseTitle);
             addRow(form, gbc, row++, "Course Code", courseCode);
             addRow(form, gbc, row++, "Instructor Code", instructor);
             addRow(form, gbc, row++, "Capacity", capacity);
@@ -223,6 +263,8 @@ public class CreateSectionWindow extends JFrame {
             add(form, BorderLayout.CENTER);
 
             submit.addActionListener(e -> doCreateSection());
+            loadCourses();
+            loadInstructors();
         }
 
         private void addRow(JPanel p, GridBagConstraints gbc, int row, String label, JComponent field) {
@@ -231,43 +273,67 @@ public class CreateSectionWindow extends JFrame {
             p.add(l, gbc);
             gbc.gridx = 1;
             field.setPreferredSize(new Dimension(FIELD_WIDTH, FIELD_HEIGHT));
-            field.setMaximumSize(new Dimension(FIELD_WIDTH, FIELD_HEIGHT));
-            field.setMinimumSize(new Dimension(FIELD_WIDTH, FIELD_HEIGHT));
-            if (field instanceof JComboBox) {
-                ((JComboBox<?>) field).setPreferredSize(new Dimension(FIELD_WIDTH, FIELD_HEIGHT));
-                ((JComboBox<?>) field).setMaximumSize(new Dimension(FIELD_WIDTH, FIELD_HEIGHT));
-                ((JComboBox<?>) field).setMinimumSize(new Dimension(FIELD_WIDTH, FIELD_HEIGHT));
-            }
             p.add(field, gbc);
         }
 
-        private JTextField textField(String placeholder) {
-            JTextField f = new JTextField(30);
-            f.setFont(new Font("Segoe UI", Font.PLAIN, 18));
-            f.setText(placeholder);
-            return f;
+        private void loadCourses() {
+            SwingWorker<Void, Void> w = new SwingWorker<>() {
+                List<CourseResponse> courses;
+                @Override protected Void doInBackground() {
+                    try {
+                        LOGGER.info("Loading courses");
+                        courses = admin.listCourses();
+                    } catch (Exception e) {
+                        LOGGER.log(Level.SEVERE, "Failed to load courses", e);
+                    }
+                    return null;
+                }
+                @Override protected void done() {
+                    if (courses != null) {
+                        for (CourseResponse course : courses) {
+                            courseCode.addItem(course.courseId());
+                        }
+                    }
+                }
+            };
+            w.execute();
         }
 
-        private JComboBox<String> comboBox(String def, String... items) {
-            String[] data = new String[items.length + 1];
-            data[0] = def;
-            System.arraycopy(items, 0, data, 1, items.length);
-            JComboBox<String> cb = new JComboBox<>(data);
-            cb.setFont(new Font("Segoe UI", Font.PLAIN, 18));
-            return cb;
+        private void loadInstructors() {
+            SwingWorker<Void, Void> w = new SwingWorker<>() {
+                List<InstructorResponse> instructors;
+                @Override protected Void doInBackground() {
+                    try {
+                        LOGGER.info("Loading instructors");
+                        instructors = admin.listInstructors();
+                    } catch (Exception e) {
+                        LOGGER.log(Level.SEVERE, "Failed to load instructors", e);
+                    }
+                    return null;
+                }
+                @Override protected void done() {
+                    if (instructors != null) {
+                        for (InstructorResponse inst : instructors) {
+                            instructor.addItem(inst.instructorCode());
+                        }
+                    }
+                }
+            };
+            w.execute();
         }
 
         private void doCreateSection() {
+            LOGGER.info("Create section action initiated");
             if (admin == null) {
+                LOGGER.warning("Create section aborted: admin session is null");
                 JOptionPane.showMessageDialog(CreateSectionWindow.this, "No admin session. Please log in as admin.", "Error", JOptionPane.ERROR_MESSAGE);
-                System.out.println("CreateSection aborted: admin null");
                 return;
             }
-            String courseId = courseCode.getText().trim();
-            String instr = instructor.getSelectedItem() == null ? "" : instructor.getSelectedItem().toString();
-            String capStr = capacity.getSelectedItem() == null ? "0" : capacity.getSelectedItem().toString();
+            String courseId = courseCode.getSelectedItem().toString();
+            String instr = instructor.getSelectedItem().toString();
+            String capStr = capacity.getSelectedItem().toString();
             String regDeadline = deadline.getText().trim();
-            System.out.println("CreateSection calling API courseId=" + courseId + " instructor=" + instr + " capacity=" + capStr + " deadline=" + regDeadline);
+
             submit.setEnabled(false);
             SwingWorker<Void, Void> worker = new SwingWorker<>() {
                 @Override protected Void doInBackground() {
@@ -280,12 +346,12 @@ public class CreateSectionWindow extends JFrame {
                                 LocalDate.parse(regDeadline),
                                 true
                         );
+                        LOGGER.info("Creating section for course " + courseId + " with request: " + req);
                         admin.createSection(courseId, req);
-                        System.out.println("CreateSection success");
+                        LOGGER.info("Section created successfully for course: " + courseId);
                         JOptionPane.showMessageDialog(CreateSectionWindow.this, "Section created successfully", "Success", JOptionPane.INFORMATION_MESSAGE);
                     } catch (Exception ex) {
-                        System.out.println("CreateSection error: " + ex.getMessage());
-                        ex.printStackTrace();
+                        LOGGER.log(Level.SEVERE, "Failed to create section for course " + courseId, ex);
                         JOptionPane.showMessageDialog(CreateSectionWindow.this, "Error: " + ex.getMessage(), "Failed", JOptionPane.ERROR_MESSAGE);
                     }
                     return null;

@@ -6,6 +6,8 @@ import javax.swing.*;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public class CreateCoursesWindow extends JFrame {
 
@@ -17,9 +19,13 @@ public class CreateCoursesWindow extends JFrame {
     private JComboBox<String> cbDept;
     private JComboBox<String> cbCredits;
     private JButton btnCreate;
+    private final static Logger LOGGER = Logger.getLogger(CreateCoursesWindow.class.getName());
+    private Timer sidebarAnimator;
+
 
     public CreateCoursesWindow(AdminClient admin) {
         this.admin = admin;
+        LOGGER.info("CreateCoursesWindow initialized");
 
         setTitle("Create Courses");
         setSize(1100, 680);
@@ -64,7 +70,12 @@ public class CreateCoursesWindow extends JFrame {
 
         MouseAdapter slideHandler = new MouseAdapter() {
             @Override public void mouseEntered(MouseEvent e) { slideSidebar(sidebar, true); }
-            @Override public void mouseExited(MouseEvent e) { slideSidebar(sidebar, false); }
+            @Override public void mouseExited(MouseEvent e) {
+                Point p = e.getPoint();
+                if (p.x > sidebar.getWidth()) {
+                    slideSidebar(sidebar, false);
+                }
+            }
         };
         sidebar.addMouseListener(slideHandler);
         arrow.addMouseListener(slideHandler);
@@ -115,12 +126,13 @@ public class CreateCoursesWindow extends JFrame {
     }
 
     private void doCreateCourse() {
+        LOGGER.info("Create course action initiated");
         if (admin == null) {
+            LOGGER.warning("Create course aborted: admin session is null");
             JOptionPane.showMessageDialog(this, "No admin session. Please log in as admin.", "Error", JOptionPane.ERROR_MESSAGE);
-            System.out.println("CreateCourse aborted: admin null");
             return;
         }
-        System.out.println("CreateCourse calling API courseId=" + txtCode.getText().trim());
+
         btnCreate.setEnabled(false);
         SwingWorker<Void, Void> worker = new SwingWorker<>() {
             @Override protected Void doInBackground() {
@@ -131,12 +143,12 @@ public class CreateCoursesWindow extends JFrame {
                             .deptId(cbDept.getSelectedItem().toString())
                             .credits(Integer.parseInt(cbCredits.getSelectedItem().toString()))
                             .build();
+                    LOGGER.info("Creating course: " + req);
                     admin.createCourse(req);
-                    System.out.println("CreateCourse success");
+                    LOGGER.info("Course created successfully: " + req.courseId());
                     JOptionPane.showMessageDialog(CreateCoursesWindow.this, "Course created successfully", "Success", JOptionPane.INFORMATION_MESSAGE);
                 } catch (Exception ex) {
-                    System.out.println("CreateCourse error: " + ex.getMessage());
-                    ex.printStackTrace();
+                    LOGGER.log(Level.SEVERE, "Failed to create course", ex);
                     JOptionPane.showMessageDialog(CreateCoursesWindow.this, "Error: " + ex.getMessage(), "Failed", JOptionPane.ERROR_MESSAGE);
                 }
                 return null;
@@ -147,9 +159,19 @@ public class CreateCoursesWindow extends JFrame {
     }
 
     private void slideSidebar(JPanel sidebar, boolean show) {
-        int target = show ? 0 : -SIDEBAR_WIDTH + 20;
-        sidebar.setLocation(target, sidebar.getY());
-        sidebar.revalidate();
-        sidebar.repaint();
+        if (sidebarAnimator != null && sidebarAnimator.isRunning()) {
+            sidebarAnimator.stop();
+        }
+        int startX = sidebar.getX();
+        int endX = show ? 0 : -SIDEBAR_WIDTH + 20;
+        sidebarAnimator = new Timer(10, e -> {
+            int newX = sidebar.getX() + (show ? 10 : -10);
+            if ((show && newX >= endX) || (!show && newX <= endX)) {
+                newX = endX;
+                ((Timer) e.getSource()).stop();
+            }
+            sidebar.setLocation(newX, sidebar.getY());
+        });
+        sidebarAnimator.start();
     }
 }

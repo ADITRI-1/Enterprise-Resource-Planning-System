@@ -1,15 +1,18 @@
 package com.iiitd.erp.ui;
 
 import com.iiitd.erp.io.dto.request.InstructorCreateRequest;
+import com.iiitd.erp.io.dto.response.DepartmentResponse;
 import com.iiitd.erp.ui.client.AdminClient;
 import javax.swing.*;
 import javax.swing.border.*;
 import java.awt.*;
 import java.awt.event.*;
+import java.util.List;
 
 public class FacultyAccountWindow extends JFrame {
 
     private final AdminClient admin;
+    private final JFrame parent;
 
     private JTextField fullName;
     private JTextField instructorCode;
@@ -18,11 +21,13 @@ public class FacultyAccountWindow extends JFrame {
     private JTextField email;
     private JTextField phone;
     private JButton submit;
+    private List<DepartmentResponse> departments;
 
-    public FacultyAccountWindow() { this(null); }
+    public FacultyAccountWindow() { this(null, null); }
 
-    public FacultyAccountWindow(AdminClient admin) {
+    public FacultyAccountWindow(AdminClient admin, JFrame parent) {
         this.admin = admin;
+        this.parent = parent;
 
         setTitle("Create Faculty Account");
         setSize(1280, 780);
@@ -30,7 +35,7 @@ public class FacultyAccountWindow extends JFrame {
         setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
         setLayout(new BorderLayout());
 
-        add(new HeaderBar(), BorderLayout.NORTH);
+        add(buildTopBar(), BorderLayout.NORTH);
         add(new FooterBar(), BorderLayout.SOUTH);
 
         JPanel main = new JPanel(new BorderLayout());
@@ -41,6 +46,26 @@ public class FacultyAccountWindow extends JFrame {
         main.add(slidingLeft, BorderLayout.WEST);
 
         main.add(new ContentPanel(), BorderLayout.CENTER);
+
+        loadDepartments();
+    }
+
+    private JComponent buildTopBar() {
+        JPanel bar = new JPanel(new FlowLayout(FlowLayout.RIGHT, 10, 8));
+        bar.setBackground(new Color(245, 248, 251));
+        JButton back = new JButton("Back");
+        JButton logout = new JButton("Logout");
+        back.addActionListener(e -> {
+            dispose();
+            if (parent != null) parent.setVisible(true);
+        });
+        logout.addActionListener(e -> {
+            if (parent != null) parent.dispose();
+            dispose();
+            new LoginUI().setVisible(true);
+        });
+        bar.add(back); bar.add(logout);
+        return bar;
     }
 
     static class SlidingPanel extends JPanel {
@@ -151,6 +176,8 @@ public class FacultyAccountWindow extends JFrame {
             nav.add(navButton("Create Courses"));
             nav.add(Box.createVerticalStrut(12));
             nav.add(navButton("Create Sections"));
+            nav.add(Box.createVerticalStrut(12));
+            nav.add(navButton("Manage Users"));
 
             add(wrap(nav, 16), BorderLayout.CENTER);
         }
@@ -219,7 +246,7 @@ public class FacultyAccountWindow extends JFrame {
             instructorCode = addField("Instructor Code", baseX, 300, labelWidth, rowH, fieldWidth);
 
             JLabel depLabel = label("Department"); depLabel.setBounds(baseX, 360, labelWidth, rowH); add(depLabel);
-            depBox = new JComboBox<>(new String[]{"CSE", "ECE", "SSH", "AI"});
+            depBox = new JComboBox<>();
             depBox.setFont(new Font("Segoe UI", Font.PLAIN, 18));
             depBox.setBounds(baseX + labelWidth + 20, 360, fieldWidth, rowH);
             add(depBox);
@@ -247,24 +274,6 @@ public class FacultyAccountWindow extends JFrame {
         private JLabel label(String t) { JLabel l = new JLabel(t); l.setFont(new Font("Segoe UI", Font.PLAIN, 18)); l.setForeground(new Color(50, 60, 80)); return l; }
     }
 
-    static class HeaderBar extends JPanel {
-        HeaderBar() { setPreferredSize(new Dimension(0, 72)); }
-        protected void paintComponent(Graphics g) {
-            super.paintComponent(g);
-            Graphics2D g2 = (Graphics2D) g;
-            g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
-            g2.setColor(new Color(9, 53, 82)); g2.fillRect(0, 0, getWidth(), getHeight());
-            int x = 30; int cy = getHeight() / 2;
-            g2.setColor(Color.WHITE); int barW = 8, barH = 36, gap = 8;
-            for (int i = 0; i < 4; i++) { g2.fillRoundRect(x, cy - 18, barW, barH, 6, 6); x += barW + gap; }
-            g2.setColor(new Color(85, 172, 168)); g2.setStroke(new BasicStroke(8, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND)); g2.drawArc(x - 12, cy - 18, 36, 36, -90, 180);
-            g2.setColor(Color.WHITE); g2.setFont(new Font("Segoe UI", Font.BOLD, 16));
-            g2.drawString("INDRAPRASTHA INSTITUTE of", 120, cy - 4);
-            String line2 = "INFORMATION TECHNOLOGY"; g2.drawString(line2, 120, cy + 18);
-            g2.setColor(new Color(85, 172, 168)); g2.drawString("DELHI", 120 + g2.getFontMetrics().stringWidth(line2) + 8, cy + 18);
-        }
-    }
-
     static class FooterBar extends JPanel {
         FooterBar() { setPreferredSize(new Dimension(0, 50)); }
         protected void paintComponent(Graphics g) {
@@ -276,13 +285,27 @@ public class FacultyAccountWindow extends JFrame {
         }
     }
 
+    private void loadDepartments() {
+        if (admin == null) return;
+        SwingWorker<Void, Void> w = new SwingWorker<>() {
+            @Override protected Void doInBackground() {
+                try { departments = admin.listDepartments(); }
+                catch (Exception ex) { ex.printStackTrace(); }
+                return null;
+            }
+            @Override protected void done() {
+                depBox.removeAllItems();
+                if (departments != null) departments.forEach(d -> depBox.addItem(d.deptId()));
+            }
+        };
+        w.execute();
+    }
+
     private void doCreateInstructor() {
         if (admin == null) {
             JOptionPane.showMessageDialog(this, "No admin session. Please log in as admin.", "Error", JOptionPane.ERROR_MESSAGE);
-            System.out.println("CreateInstructor aborted: admin null");
             return;
         }
-        System.out.println("CreateInstructor calling API code=" + instructorCode.getText().trim() + " dept=" + depBox.getSelectedItem());
         submit.setEnabled(false);
         SwingWorker<Void, Void> worker = new SwingWorker<>() {
             @Override protected Void doInBackground() {
@@ -290,17 +313,14 @@ public class FacultyAccountWindow extends JFrame {
                     InstructorCreateRequest req = InstructorCreateRequest.builder()
                             .name(fullName.getText().trim())
                             .instructorCode(instructorCode.getText().trim())
-                            .deptId(depBox.getSelectedItem().toString())
+                            .deptId(depBox.getSelectedItem() == null ? null : depBox.getSelectedItem().toString())
                             .dateOfBirth(dob.getText().trim())
                             .email(email.getText().trim())
                             .phone(phone.getText().trim())
                             .build();
                     admin.createInstructor(req);
-                    System.out.println("CreateInstructor success");
                     JOptionPane.showMessageDialog(FacultyAccountWindow.this, "Instructor created successfully", "Success", JOptionPane.INFORMATION_MESSAGE);
                 } catch (Exception ex) {
-                    System.out.println("CreateInstructor error: " + ex.getMessage());
-                    ex.printStackTrace();
                     JOptionPane.showMessageDialog(FacultyAccountWindow.this, "Error: " + ex.getMessage(), "Failed", JOptionPane.ERROR_MESSAGE);
                 }
                 return null;

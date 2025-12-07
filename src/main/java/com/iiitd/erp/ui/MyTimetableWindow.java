@@ -1,5 +1,7 @@
 package com.iiitd.erp.ui;
 
+import com.iiitd.erp.ui.client.StudentClient;
+
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
@@ -12,11 +14,14 @@ import java.awt.event.*;
  */
 public class MyTimetableWindow extends JFrame {
 
+    private final StudentClient client;
+
     public static void main(String[] args) {
-        SwingUtilities.invokeLater(() -> new MyTimetableWindow().setVisible(true));
+        SwingUtilities.invokeLater(() -> new MyTimetableWindow(null).setVisible(true));
     }
 
-    public MyTimetableWindow() {
+    public MyTimetableWindow(StudentClient client) {
+        this.client = client;
         setTitle("My Timetable");
         setSize(1250, 760);
         setLocationRelativeTo(null);
@@ -32,7 +37,7 @@ public class MyTimetableWindow extends JFrame {
         add(main, BorderLayout.CENTER);
 
         // sliding left rail (hover expands)
-        main.add(new SlidingPanel(new LeftRail()), BorderLayout.WEST);
+        main.add(new SlidingPanel(new LeftRail(client)), BorderLayout.WEST);
 
         // content area
         main.add(new ContentArea(), BorderLayout.CENTER);
@@ -205,7 +210,9 @@ public class MyTimetableWindow extends JFrame {
 
     /* ---------------- LEFT RAIL ---------------- */
     static class LeftRail extends JPanel {
-        LeftRail() {
+        private final StudentClient client;
+        LeftRail(StudentClient client) {
+            this.client = client;
             setOpaque(false);
             setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
             add(Box.createVerticalStrut(18));
@@ -259,13 +266,13 @@ public class MyTimetableWindow extends JFrame {
             add(pad(card, 12, 16, 8, 16));
 
             add(Box.createVerticalStrut(10));
-            add(nav("My Courses", e -> new MyCoursesWindow().setVisible(true)));
+            add(nav("My Courses", e -> new MyCoursesWindow(client).setVisible(true)));
             add(Box.createVerticalStrut(10));
-            add(nav("Register Courses", e -> new RegisterCoursesWindow().setVisible(true)));
+            add(nav("Register Courses", e -> new RegisterCoursesWindow(client).setVisible(true)));
             add(Box.createVerticalStrut(10));
-            add(nav("My Timetable", e -> new MyTimetableWindow().setVisible(true)));
+            add(nav("My Timetable", e -> new MyTimetableWindow(client).setVisible(true)));
             add(Box.createVerticalStrut(10));
-            add(nav("Grades", e -> new ViewGradesWindow().setVisible(true)));
+            add(nav("Grades", e -> new ViewGradesWindow(client).setVisible(true)));
 
             add(Box.createVerticalGlue());
         }
@@ -351,19 +358,19 @@ public class MyTimetableWindow extends JFrame {
        These stubs exist so the file compiles standalone.
     */
     public static class MyCoursesWindow extends JFrame {
-        public MyCoursesWindow() {
+        public MyCoursesWindow(StudentClient client) {
             setTitle("My Courses"); setSize(900,600); setLocationRelativeTo(null);
             add(new JLabel("MyCoursesWindow - stub"), BorderLayout.CENTER);
         }
     }
     public static class RegisterCoursesWindow extends JFrame {
-        public RegisterCoursesWindow() {
+        public RegisterCoursesWindow(StudentClient client) {
             setTitle("Register Courses"); setSize(900,600); setLocationRelativeTo(null);
             add(new JLabel("RegisterCoursesWindow - stub"), BorderLayout.CENTER);
         }
     }
     public static class ViewGradesWindow extends JFrame {
-        public ViewGradesWindow() {
+        public ViewGradesWindow(StudentClient client) {
             setTitle("View Grades"); setSize(900,600); setLocationRelativeTo(null);
             add(new JLabel("ViewGradesWindow - stub"), BorderLayout.CENTER);
         }

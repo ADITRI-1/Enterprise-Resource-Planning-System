@@ -3,9 +3,16 @@ package com.iiitd.erp.ui;
 import com.iiitd.erp.ui.client.AuthClient;
 import com.iiitd.erp.ui.client.AdminClient;
 import com.iiitd.erp.ui.client.AuthClient.LoginResult;
+import com.iiitd.erp.ui.client.InstructorClient;
+import com.iiitd.erp.ui.client.StudentClient;
+import com.iiitd.erp.ui.AdminDashboardExact;
+import com.iiitd.erp.ui.InstructorDashboardWindow;
+import com.iiitd.erp.ui.StudentDashboardWindow;
+
 import javax.swing.*;
 import java.awt.*;
 import java.util.Objects;
+import java.util.logging.Logger;
 
 public class LoginUI extends JFrame {
 
@@ -17,7 +24,11 @@ public class LoginUI extends JFrame {
     private final JLabel newUserLabel, forgotPasswordLabel, helpLabel;
 
     private final AuthClient authClient;
+    private final StudentClient studentClient;
+    private final InstructorClient instructorClient;
     private final String baseUrl;
+    private final static Logger LOGGER = Logger.getLogger(LoginUI.class.getName());
+
 
     public LoginUI() {
         this("http://localhost:8080");
@@ -26,7 +37,11 @@ public class LoginUI extends JFrame {
     public LoginUI(String baseUrl) {
         this.baseUrl = baseUrl;
         this.authClient = new AuthClient(baseUrl);
+        this.studentClient = new StudentClient(baseUrl);
+        this.instructorClient = new InstructorClient(baseUrl);
 
+
+        LOGGER.info("LoginUI initialized");
         setTitle("IIITD ERP Login");
         setSize(700, 480);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
@@ -163,23 +178,27 @@ public class LoginUI extends JFrame {
         String user = usernameField.getText().trim();
         String pass = new String(passwordField.getPassword());
         String role = Objects.requireNonNull(roleComboBox.getSelectedItem()).toString();
+        LOGGER.info("Login attempt for user: " + user + " with role: " + role);
 
         loginButton.setEnabled(false);
         SwingWorker<Void, Void> worker = new SwingWorker<>() {
             @Override protected Void doInBackground() {
                 try {
-                    LoginResult result = authClient.login(user, pass);
+                    LoginResult result = authClient.login(user, pass, role);
                     if (result.success()) {
+                        LOGGER.info("Login successful for user: " + user);
                         JOptionPane.showMessageDialog(LoginUI.this,
                                 result.message(),
                                 "Login Successful", JOptionPane.INFORMATION_MESSAGE);
                         openDashboard(result);
                     } else {
+                        LOGGER.warning("Login failed for user: " + user + " - " + result.message());
                         JOptionPane.showMessageDialog(LoginUI.this,
                                 "Login failed: " + result.message(),
                                 "Login Failed", JOptionPane.ERROR_MESSAGE);
                     }
                 } catch (Exception ex) {
+                    LOGGER.severe("Login error for user: " + user + " - " + ex.getMessage());
                     JOptionPane.showMessageDialog(LoginUI.this,
                             "Login error: " + ex.getMessage(),
                             "Error", JOptionPane.ERROR_MESSAGE);
@@ -192,9 +211,16 @@ public class LoginUI extends JFrame {
     }
 
     private void openDashboard(LoginResult result) {
+        LOGGER.info("Opening " + result.role() + " dashboard for user: " + result.cookieHeader());
         switch (result.role().toUpperCase()) {
-            case "STUDENT" -> SwingUtilities.invokeLater(() -> new StudentDashboardWindow().setVisible(true));
-            case "INSTRUCTOR" -> SwingUtilities.invokeLater(() -> new InstructorDashboardWindow().setVisible(true));
+            case "STUDENT" -> SwingUtilities.invokeLater(() -> {
+                studentClient.setCookieHeader(result.cookieHeader());
+                new StudentDashboardWindow(studentClient).setVisible(true);
+            });
+            case "INSTRUCTOR" -> SwingUtilities.invokeLater(() -> {
+                instructorClient.setCookieHeader(result.cookieHeader());
+                new InstructorDashboardWindow(instructorClient).setVisible(true);
+            });
             case "ADMIN" -> SwingUtilities.invokeLater(() -> {
                 AdminClient admin = new AdminClient(baseUrl, result.cookieHeader());
                 new AdminDashboardExact(admin).setVisible(true);
