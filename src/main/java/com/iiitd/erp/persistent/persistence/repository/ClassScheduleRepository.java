@@ -12,31 +12,31 @@ import java.util.UUID;
 
 public interface ClassScheduleRepository extends JpaRepository<ClassSchedule, UUID> {
 
-    @Query("""
-           select cs from ClassSchedule cs
-           where cs.roomId = :roomId
-             and cs.dayOfWeek = :day
-             and cs.startTime < :end
-             and cs.endTime > :start
-             and (:excludeSectionId is null or cs.sectionId <> :excludeSectionId)
-           """)
+    @Query(value = """
+            select * from erp_db.class_schedules cs
+            where cs.room_id = :roomId
+              and cs.day_of_week = :day
+              and cs.start_time < :end
+              and cs.end_time > :start
+              and (:excludeSectionId is null or cs.section_id <> :excludeSectionId)
+            """, nativeQuery = true)
     List<ClassSchedule> roomConflicts(@Param("roomId") String roomId,
-                                      @Param("day") Weekday day,
+                                      @Param("day") String day,
                                       @Param("start") LocalTime start,
                                       @Param("end") LocalTime end,
                                       @Param("excludeSectionId") String excludeSectionId);
 
-    @Query("""
-           select cs from ClassSchedule cs
-           join Section s on s.sectionId = cs.sectionId
-           where s.instructorCode = :instructorCode
-             and cs.dayOfWeek = :day
-             and cs.startTime < :end
-             and cs.endTime > :start
-             and (:excludeSectionId is null or cs.sectionId <> :excludeSectionId)
-           """)
+    @Query(value = """
+            select cs.* from erp_db.class_schedules cs
+            join erp_db.sections s on s.section_id = cs.section_id
+            where s.instructor_code = :instructorCode
+              and cs.day_of_week = :day
+              and cs.start_time < :end
+              and cs.end_time > :start
+              and (:excludeSectionId is null or cs.section_id <> :excludeSectionId)
+            """, nativeQuery = true)
     List<ClassSchedule> instructorConflicts(@Param("instructorCode") String instructorCode,
-                                            @Param("day") Weekday day,
+                                            @Param("day") String day,
                                             @Param("start") LocalTime start,
                                             @Param("end") LocalTime end,
                                             @Param("excludeSectionId") String excludeSectionId);

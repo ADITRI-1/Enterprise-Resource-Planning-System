@@ -24,7 +24,6 @@ public interface DomainToEntityMapper {
     @Mapping(target = "departmentId", source = "deptId")
     Instructor instructorDomainToInstructor(InstructorDomain instructorDomain);
 
-    @Mapping(target = "program_type", source = "programType")
     Program programDomainToProgram(ProgramDomain programDomain);
 
     Department departmentDomainToDepartment(DepartmentDomain departmentDomain);

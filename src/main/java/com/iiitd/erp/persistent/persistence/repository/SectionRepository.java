@@ -17,15 +17,15 @@ public interface SectionRepository extends JpaRepository<Section, String> {
                s.instructorCode,
                null,
                coalesce(s.capacity, 0),
-               cast(coalesce(sum(case when lower(e.status) = 'enrolled' then 1 else 0 end), 0) as integer),
-               cast(coalesce(s.capacity, 0) - coalesce(sum(case when lower(e.status) = 'enrolled' then 1 else 0 end), 0) as integer),
+               cast(coalesce(sum(case when e.status = 'enrolled' then 1 else 0 end), 0) as integer),
+               cast(coalesce(s.capacity, 0) - coalesce(sum(case when e.status = 'enrolled' then 1 else 0 end), 0) as integer),
                s.semester,
                s.year
            )
            from Section s
            left join Enrollment e on e.sectionId = s.sectionId
            where s.courseId = :courseId
-             and upper(s.semester) = upper(:sem)
+             and s.semester = :sem
              and s.year = :yr
              and (s.isActive is null or s.isActive = true)
            group by s.sectionId, s.courseId, s.instructorCode, s.capacity, s.semester, s.year
@@ -42,4 +42,13 @@ public interface SectionRepository extends JpaRepository<Section, String> {
     List<Section> findByInstructorCodeIgnoreCase(String instructorCode);
 
     List<Section> findByInstructorCodeIgnoreCaseAndSemesterIgnoreCaseAndYear(String instructorCode, String semester, Integer year);
+
+    @Query("""
+       select s from Section s
+       where (:semester is null or s.semester = :semester)
+         and (:year is null or s.year = :year)
+       order by s.sectionId
+       """)
+    List<Section> findAllFiltered(@Param("semester") String semester, @Param("year") Integer year);
+
 }

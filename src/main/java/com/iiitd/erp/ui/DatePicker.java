@@ -14,6 +14,7 @@ public class DatePicker extends JDialog {
     private final JComboBox<String> monthComboBox;
     private final JComboBox<Integer> yearComboBox;
     private final JPanel calendarGrid;
+    private final DateTimeFormatter displayFormatter = DateTimeFormatter.ofPattern("dd-MM-yyyy");
 
     public DatePicker(Frame parent) {
         super(parent, "Select Date", true);
@@ -68,7 +69,6 @@ public class DatePicker extends JDialog {
         int month = monthComboBox.getSelectedIndex() + 1;
         selectedDate = LocalDate.of(year, month, Math.min(selectedDate.getDayOfMonth(), LocalDate.of(year, month, 1).lengthOfMonth()));
         buildCalendarGrid();
-        // Repack and repaint
         revalidate();
         pack();
     }
@@ -76,7 +76,6 @@ public class DatePicker extends JDialog {
     private void buildCalendarGrid() {
         calendarGrid.removeAll();
 
-        // Day headers
         for (String day : new String[]{"Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"}) {
             JLabel dayLabel = new JLabel(day, SwingConstants.CENTER);
             dayLabel.setFont(new Font("Segoe UI", Font.BOLD, 14));
@@ -115,6 +114,9 @@ public class DatePicker extends JDialog {
     }
 
     public String getSelectedDateAsString() {
-        return selectedDate.format(DateTimeFormatter.ISO_LOCAL_DATE);
+        if (selectedDate != null) {
+            return selectedDate.format(displayFormatter);
+        }
+        return "";
     }
 }

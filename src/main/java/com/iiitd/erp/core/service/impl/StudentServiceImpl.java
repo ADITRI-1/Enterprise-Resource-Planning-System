@@ -1,6 +1,7 @@
 package com.iiitd.erp.core.service.impl;
 
 import com.iiitd.erp.Domain.CreateUserDomain;
+import com.iiitd.erp.Domain.ProgramDomain;
 import com.iiitd.erp.Domain.StudentUserDomain;
 import com.iiitd.erp.Domain.UserAuthDomain;
 import com.iiitd.erp.core.ProgramPersistPort;
@@ -17,6 +18,8 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -50,11 +53,14 @@ public class StudentServiceImpl implements StudentService {
             throw ErpException.of(ErrorCode.DUPLICATE_STUDENT, Map.of("rollNo", rollNo));
         }
 
-        ensureProgramExists(studentDomain.getProgramId());
+        ProgramDomain program = programPersistPort.findByProgramId(studentDomain.getProgramId());
+        if (program == null) {
+            throw ErpException.of(ErrorCode.PROGRAM_NOT_FOUND, Map.of("programId", studentDomain.getProgramId()));
+        };
 
         try {
             UUID userId = UUID.randomUUID();
-            String username = buildStudentUsername(studentDomain);
+            String username = buildStudentUsername(studentDomain, program.getProgramType());
             String rawPassword = buildStudentPassword(studentDomain);
             String passwordHash = passwordEncoder.encode(rawPassword);
 
@@ -90,9 +96,18 @@ public class StudentServiceImpl implements StudentService {
         String rollNo = studentDomain.getRollNo();
         LOGGER.info("Updating student user for roll {}", rollNo);
 
-        if (studentPersistPort.findByRollNo(rollNo) == null) {
+        StudentUserDomain existing = studentPersistPort.findByRollNo(rollNo);
+        if (existing == null) {
             throw ErpException.of(ErrorCode.STUDENT_NOT_FOUND, Map.of("rollNo", rollNo));
         }
+
+        StudentUserDomain merged = existing
+                .withName(keep(studentDomain.getName(), existing.getName()))
+                .withDateOfBirth(keep(studentDomain.getDateOfBirth(), existing.getDateOfBirth()))
+                .withProgramId(keep(studentDomain.getProgramId(), existing.getProgramId()))
+                .withYearOfRegistration(keep(studentDomain.getYearOfRegistration(), existing.getYearOfRegistration()))
+                .withRollNo(existing.getRollNo())      // stick to path value
+                .withStudentId(existing.getStudentId());
 
         ensureProgramExists(studentDomain.getProgramId());
 
@@ -113,12 +128,16 @@ public class StudentServiceImpl implements StudentService {
     public boolean deleteStudentUser(String rollNo) {
         LOGGER.info("Deleting student user for roll {}", rollNo);
 
-        if (studentPersistPort.findByRollNo(rollNo) == null) {
+        StudentUserDomain existing = studentPersistPort.findByRollNo(rollNo);
+        if (existing == null) {
             throw ErpException.of(ErrorCode.STUDENT_NOT_FOUND, Map.of("rollNo", rollNo));
         }
 
         try {
             boolean deleted = studentPersistPort.deleteStudent(rollNo);
+            if (existing.getStudentId() != null) {
+                userAuthPersistPort.deleteByUserId(existing.getStudentId());
+            }
             LOGGER.info("Deleted student user for roll {}: {}", rollNo, deleted);
             return deleted;
         } catch (ErpException ex) {
@@ -153,17 +172,28 @@ public class StudentServiceImpl implements StudentService {
         }
     }
 
-    private String buildStudentUsername(StudentUserDomain studentDomain) {
+    private String buildStudentUsername(StudentUserDomain studentDomain, String programType) {
         String firstName = studentDomain.getName().split(" ")[0].toLowerCase();
-        String programType = studentDomain.getProgramId().toLowerCase().contains("b.tech") ? "bt" : "mt";
-        return firstName + "_" + programType + studentDomain.getRollNo();
+        String suffix = programType.toLowerCase().contains("b.tech") ? "bt" : "mt";
+        return firstName + "_" + suffix + studentDomain.getRollNo();
     }
 
     private String buildStudentPassword(StudentUserDomain studentDomain) {
-        String dob = studentDomain.getDateOfBirth();
-        String monthDay = dob.substring(3, 5) + dob.substring(0, 2);
-        String rollNo = studentDomain.getRollNo().toString();
-        String lastThreeRollNo = rollNo.substring(rollNo.length() - 3);
-        return monthDay + lastThreeRollNo;
+        LocalDate dob = parseDob(studentDomain.getDateOfBirth());
+        String monthDay = String.format("%02d%02d", dob.getMonthValue(), dob.getDayOfMonth());
+
+        String rollNo = studentDomain.getRollNo();
+        String lastThree = rollNo.substring(Math.max(rollNo.length() - 3, 0));
+        return monthDay + lastThree;
     }
+
+    private LocalDate parseDob(String dob) {
+        if (dob == null) throw new IllegalArgumentException("DOB is required");
+        try { return LocalDate.parse(dob, DateTimeFormatter.ISO_LOCAL_DATE); }          // yyyy-MM-dd
+        catch (Exception ignore) { }
+        try { return LocalDate.parse(dob, DateTimeFormatter.ofPattern("dd-MM-yyyy")); } // legacy
+        catch (Exception ex) { throw new IllegalArgumentException("Invalid DOB: " + dob, ex); }
+    }
+
+    private <T> T keep(T incoming, T existing) { return incoming != null ? incoming : existing; }
 }

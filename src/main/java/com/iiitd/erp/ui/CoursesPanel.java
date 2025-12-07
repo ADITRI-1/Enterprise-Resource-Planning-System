@@ -7,6 +7,7 @@ import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -17,10 +18,13 @@ public class CoursesPanel extends JPanel {
     private final CardLayout cardLayout = new CardLayout();
     private final JPanel mainPanel = new JPanel(cardLayout);
     private JTable coursesTable;
+    private List<CourseResponse> courseList = new ArrayList<>();
     private static final Logger LOGGER = Logger.getLogger(CoursesPanel.class.getName());
+    private final boolean isMaintenanceMode;
 
-    public CoursesPanel(AdminClient admin) {
+    public CoursesPanel(AdminClient admin, boolean maintenanceMode) {
         this.admin = admin;
+        this.isMaintenanceMode = maintenanceMode;
         setOpaque(false);
         setLayout(new BorderLayout());
         setBorder(new EmptyBorder(10, 20, 10, 20));
@@ -40,12 +44,19 @@ public class CoursesPanel extends JPanel {
         mainPanel.add(createCoursePanel, "create");
 
         cardLayout.show(mainPanel, "list");
-        loadCourses();
+        loadData();
     }
 
     private void showListAndRefresh() {
-        loadCourses();
+        loadData();
         cardLayout.show(mainPanel, "list");
+    }
+    
+    private void showMaintenanceMessage() {
+        JOptionPane.showMessageDialog(this,
+                "Action disabled: The application is currently in maintenance mode.",
+                "Maintenance Mode",
+                JOptionPane.INFORMATION_MESSAGE);
     }
 
     private JPanel createListCoursesPanel() {
@@ -66,15 +77,33 @@ public class CoursesPanel extends JPanel {
 
         JButton addButton = new JButton("Add New Course");
         stylePrimaryButton(addButton);
-        addButton.addActionListener(e -> cardLayout.show(mainPanel, "create"));
+        addButton.addActionListener(e -> {
+            if (isMaintenanceMode) {
+                showMaintenanceMessage();
+                return;
+            }
+            cardLayout.show(mainPanel, "create");
+        });
 
         JButton editButton = new JButton("Edit Selected");
         styleSecondaryButton(editButton);
-        editButton.addActionListener(e -> showUpdateCoursePanel());
+        editButton.addActionListener(e -> {
+            if (isMaintenanceMode) {
+                showMaintenanceMessage();
+                return;
+            }
+            showUpdateCoursePanel();
+        });
 
         JButton deleteButton = new JButton("Delete Selected");
         styleDeleteButton(deleteButton);
-        deleteButton.addActionListener(e -> deleteCourse());
+        deleteButton.addActionListener(e -> {
+            if (isMaintenanceMode) {
+                showMaintenanceMessage();
+                return;
+            }
+            deleteCourse();
+        });
 
         buttonPanel.add(addButton);
         buttonPanel.add(editButton);
@@ -89,7 +118,7 @@ public class CoursesPanel extends JPanel {
         table.getTableHeader().setBackground(new Color(240, 240, 240));
     }
 
-    private void loadCourses() {
+    public void loadData() {
         SwingWorker<List<CourseResponse>, Void> worker = new SwingWorker<>() {
             @Override
             protected List<CourseResponse> doInBackground() {
@@ -105,11 +134,11 @@ public class CoursesPanel extends JPanel {
             @Override
             protected void done() {
                 try {
-                    List<CourseResponse> rows = get();
+                    courseList = get();
                     DefaultTableModel model = (DefaultTableModel) coursesTable.getModel();
                     model.setRowCount(0);
-                    if (rows != null) {
-                        rows.forEach(c -> model.addRow(new Object[]{c.courseId(), c.title(), c.deptId(), c.credits()}));
+                    if (courseList != null) {
+                        courseList.forEach(c -> model.addRow(new Object[]{c.courseId(), c.title(), c.deptId(), c.credits()}));
                     }
                 } catch (Exception e) {
                     LOGGER.log(Level.SEVERE, "Failed to update course table", e);
@@ -126,14 +155,7 @@ public class CoursesPanel extends JPanel {
             return;
         }
 
-        CourseResponse course = CourseResponse.builder()
-                .courseId((String) coursesTable.getValueAt(row, 0))
-                .title((String) coursesTable.getValueAt(row, 1))
-                .deptId((String) coursesTable.getValueAt(row, 2))
-                .credits((Integer) coursesTable.getValueAt(row, 3))
-                .build();
-
-
+        CourseResponse course = courseList.get(row);
         JPanel updatePanel = new UpdateCoursePanel(admin, this::showListAndRefresh, course);
         mainPanel.add(updatePanel, "updateCourse");
         cardLayout.show(mainPanel, "updateCourse");
@@ -164,7 +186,7 @@ public class CoursesPanel extends JPanel {
             }
             @Override
             protected void done() {
-                loadCourses();
+                loadData();
             }
         };
         worker.execute();

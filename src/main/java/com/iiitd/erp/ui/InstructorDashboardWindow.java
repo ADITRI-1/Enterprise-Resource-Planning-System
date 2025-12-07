@@ -12,13 +12,15 @@ public class InstructorDashboardWindow extends JFrame {
 
     private final static Logger LOGGER = Logger.getLogger(InstructorDashboardWindow.class.getName());
     private final InstructorClient client;
+    private final boolean isMaintenanceMode;
 
     public static void main(String[] args) {
-        SwingUtilities.invokeLater(() -> new InstructorDashboardWindow(null).setVisible(true));
+        SwingUtilities.invokeLater(() -> new InstructorDashboardWindow(null, false).setVisible(true));
     }
 
-    public InstructorDashboardWindow(InstructorClient client) {
+    public InstructorDashboardWindow(InstructorClient client, boolean maintenanceMode) {
         this.client = client;
+        this.isMaintenanceMode = maintenanceMode;
         LOGGER.info("InstructorDashboardWindow initialized");
         setTitle("IIITD Instructor Dashboard");
         setSize(1250, 750);
@@ -37,7 +39,6 @@ public class InstructorDashboardWindow extends JFrame {
         main.add(new ContentArea(), BorderLayout.CENTER);
     }
 
-    /* ------------ HEADER (IIITD LOGO) ------------ */
     static class HeaderBar extends JPanel {
         HeaderBar() { setPreferredSize(new Dimension(0, 90)); }
 
@@ -81,7 +82,6 @@ public class InstructorDashboardWindow extends JFrame {
         }
     }
 
-    /* ------------ SLIDING PANEL (same pattern as student flow) ------------ */
     static class SlidingPanel extends JPanel {
         private final JPanel content;
         private final ArrowIndicator arrow;
@@ -177,7 +177,6 @@ public class InstructorDashboardWindow extends JFrame {
         }
     }
 
-    /* ------------ LEFT RAIL ------------ */
     class LeftRail extends JPanel {
 
         private final InstructorClient client;
@@ -198,14 +197,14 @@ public class InstructorDashboardWindow extends JFrame {
 
             add(pad(nav("Enter Scores", e -> {
                 LOGGER.info("Navigating to InstructorEnterScoresWindow");
-                new InstructorEnterScoresWindow(client).setVisible(true);
-            }), 0, 16, 0, 16));
+                new InstructorEnterScoresWindow(client,false).setVisible(true);
+            }), 0, 16, 0, 16)).setEnabled(!isMaintenanceMode);
             add(Box.createVerticalStrut(10));
 
             add(pad(nav("Compute Grades", e -> {
                 LOGGER.info("Navigating to InstructorComputeGradesWindow");
                 new InstructorComputeGradesWindow().setVisible(true);
-            }), 0, 16, 0, 16));
+            }), 0, 16, 0, 16)).setEnabled(!isMaintenanceMode);
             add(Box.createVerticalStrut(10));
 
             add(pad(nav("View Statistics", e -> {
@@ -264,7 +263,6 @@ public class InstructorDashboardWindow extends JFrame {
             return p;
         }
 
-        /** Avatar fixed so the circle + "I" are perfectly centered */
         static class Avatar extends JComponent {
             private final String initial;
             Avatar(String i) {
@@ -276,8 +274,7 @@ public class InstructorDashboardWindow extends JFrame {
                 Graphics2D g2 = (Graphics2D) g.create();
                 g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
-                // Center the circle inside the component
-                int d = Math.min(getWidth(), getHeight()) - 20;   // diameter with some padding
+                int d = Math.min(getWidth(), getHeight()) - 20;
                 int x = (getWidth()  - d) / 2;
                 int y = (getHeight() - d) / 2;
 
@@ -288,7 +285,6 @@ public class InstructorDashboardWindow extends JFrame {
                 g2.setStroke(new BasicStroke(6f));
                 g2.drawOval(x + 3, y + 3, d - 6, d - 6);
 
-                // Center the initial inside the circle
                 g2.setColor(new Color(46, 56, 66));
                 Font f = new Font("Segoe UI", Font.BOLD, d / 2);
                 g2.setFont(f);
@@ -302,7 +298,6 @@ public class InstructorDashboardWindow extends JFrame {
         }
     }
 
-    /* ------------ DASHBOARD CONTENT ------------ */
     class ContentArea extends JPanel {
         ContentArea() {
             setOpaque(false);
@@ -343,8 +338,8 @@ public class InstructorDashboardWindow extends JFrame {
                     "Go to Gradebook", blue,
                     e -> {
                         LOGGER.info("Navigating to InstructorEnterScoresWindow");
-                        new InstructorEnterScoresWindow(client).setVisible(true);
-                    }), gbc);
+                        new InstructorEnterScoresWindow(client,false).setVisible(true);
+                    })).setEnabled(!isMaintenanceMode);
 
             gbc.gridx = 0; gbc.gridy = 1;
             grid.add(card("COMPUTE GRADES", "Compute final grades",
@@ -352,7 +347,7 @@ public class InstructorDashboardWindow extends JFrame {
                     e -> {
                         LOGGER.info("Navigating to InstructorComputeGradesWindow");
                         new InstructorComputeGradesWindow().setVisible(true);
-                    }), gbc);
+                    })).setEnabled(!isMaintenanceMode);
 
             gbc.gridx = 1; gbc.gridy = 1;
             grid.add(card("VIEW STATISTICS", "Analyze class performance",
@@ -404,6 +399,7 @@ public class InstructorDashboardWindow extends JFrame {
             b.setBorder(new EmptyBorder(10, 18, 10, 18));
             b.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
             b.addActionListener(al);
+            b.setEnabled(!isMaintenanceMode);
 
             JPanel btnWrap = new JPanel(new FlowLayout(FlowLayout.LEFT, 20, 6));
             btnWrap.setOpaque(false);
@@ -424,7 +420,6 @@ public class InstructorDashboardWindow extends JFrame {
         }
     }
 
-    /* ------------ FOOTER ------------ */
     static class FooterBar extends JPanel {
         FooterBar() { setPreferredSize(new Dimension(0, 56)); }
 

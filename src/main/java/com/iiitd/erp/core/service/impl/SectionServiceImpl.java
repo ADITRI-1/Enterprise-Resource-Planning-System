@@ -135,17 +135,35 @@ public class SectionServiceImpl implements SectionService {
 
     @Override
     public boolean deleteSection(String sectionId) {
-        LOGGER.info("Deleting section {}", sectionId);
+        LOGGER.info("Soft-deleting section {}", sectionId);
         try {
             return sections.delete(sectionId);
         } catch (ErpException ex) {
-            LOGGER.error("Known failure deleting section {}: {}", sectionId, ex.getErrorCode().getCode(), ex);
+            LOGGER.error("Known failure soft-deleting section {}: {}", sectionId, ex.getErrorCode().getCode(), ex);
             throw ex;
         } catch (Exception ex) {
-            LOGGER.error("Unexpected failure deleting section {}", sectionId, ex);
+            LOGGER.error("Unexpected failure soft-deleting section {}", sectionId, ex);
             throw ErpException.wrap(ErrorCode.SECTION_DELETE_FAILED, ex, Map.of("sectionId", sectionId));
         }
     }
+
+    @Override
+    public List<SectionDomain> listAllSections(String semester, Integer year) {
+        String normalizedSemester = normalizeSemester(semester);
+        LOGGER.info("Listing all sections (semester={}, year={})", normalizedSemester, year);
+        try {
+            return sections.findAll(normalizedSemester, year).stream()
+                    .map(this::attachInstructorCode)
+                    .collect(Collectors.toList());
+        } catch (ErpException ex) {
+            LOGGER.error("Known failure listing sections: {}", ex.getErrorCode().getCode(), ex);
+            throw ex;
+        } catch (Exception ex) {
+            LOGGER.error("Unexpected failure listing sections", ex);
+            throw ErpException.wrap(ErrorCode.SECTION_LIST_FAILED, ex, Map.of("semester", normalizedSemester, "year", year));
+        }
+    }
+
 
     @Override
     public List<SectionDomain> listSections(String courseId, String semester, Integer year) {
@@ -387,7 +405,7 @@ public class SectionServiceImpl implements SectionService {
         RoomDomain room = roomCache.computeIfAbsent(cs.getRoomId(), rooms::findByRoomId);
         String courseCode = course != null ? course.getCourseId() : section.getCourseId();
         String courseTitle = course != null ? course.getTitle() : null;
-        String roomNumber = room != null ? room.getRoomNumber() : cs.getRoomId();
+        String roomNumber = room != null ? room.getRoomId() : cs.getRoomId();
         return StudentTimeTableSlotDomain.builder()
                 .dayOfWeek(cs.getDayOfWeek().getValue())
                 .startTime(cs.getStartTime())

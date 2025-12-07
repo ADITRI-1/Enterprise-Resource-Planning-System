@@ -4,11 +4,13 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.With;
 
+import java.util.UUID;
+
 @Data
 @Builder
 @With
 public class InstructorDomain {
-    private String instructorId;
+    private UUID instructorId;
     private String name;
     private String instructorCode;
     private String dateOfBirth;

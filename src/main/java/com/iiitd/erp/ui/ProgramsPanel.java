@@ -7,6 +7,7 @@ import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -17,10 +18,13 @@ public class ProgramsPanel extends JPanel {
     private final CardLayout cardLayout = new CardLayout();
     private final JPanel mainPanel = new JPanel(cardLayout);
     private JTable programsTable;
+    private List<ProgramResponse> programList = new ArrayList<>();
     private static final Logger LOGGER = Logger.getLogger(ProgramsPanel.class.getName());
+    private final boolean isMaintenanceMode;
 
-    public ProgramsPanel(AdminClient admin) {
+    public ProgramsPanel(AdminClient admin, boolean maintenanceMode) {
         this.admin = admin;
+        this.isMaintenanceMode = maintenanceMode;
         setOpaque(false);
         setLayout(new BorderLayout());
         setBorder(new EmptyBorder(10, 20, 10, 20));
@@ -40,12 +44,19 @@ public class ProgramsPanel extends JPanel {
         mainPanel.add(createProgramPanel, "create");
 
         cardLayout.show(mainPanel, "list");
-        loadPrograms();
+        loadData();
     }
 
     private void showListAndRefresh() {
-        loadPrograms();
+        loadData();
         cardLayout.show(mainPanel, "list");
+    }
+    
+    private void showMaintenanceMessage() {
+        JOptionPane.showMessageDialog(this,
+                "Action disabled: The application is currently in maintenance mode.",
+                "Maintenance Mode",
+                JOptionPane.INFORMATION_MESSAGE);
     }
 
     private JPanel createListProgramsPanel() {
@@ -66,15 +77,33 @@ public class ProgramsPanel extends JPanel {
 
         JButton addButton = new JButton("Add New Program");
         stylePrimaryButton(addButton);
-        addButton.addActionListener(e -> cardLayout.show(mainPanel, "create"));
+        addButton.addActionListener(e -> {
+            if (isMaintenanceMode) {
+                showMaintenanceMessage();
+                return;
+            }
+            cardLayout.show(mainPanel, "create");
+        });
 
         JButton editButton = new JButton("Edit Selected");
         styleSecondaryButton(editButton);
-        editButton.addActionListener(e -> showUpdateProgramPanel());
+        editButton.addActionListener(e -> {
+            if (isMaintenanceMode) {
+                showMaintenanceMessage();
+                return;
+            }
+            showUpdateProgramPanel();
+        });
 
         JButton deleteButton = new JButton("Delete Selected");
         styleDeleteButton(deleteButton);
-        deleteButton.addActionListener(e -> deleteProgram());
+        deleteButton.addActionListener(e -> {
+            if (isMaintenanceMode) {
+                showMaintenanceMessage();
+                return;
+            }
+            deleteProgram();
+        });
 
         buttonPanel.add(addButton);
         buttonPanel.add(editButton);
@@ -89,7 +118,7 @@ public class ProgramsPanel extends JPanel {
         table.getTableHeader().setBackground(new Color(240, 240, 240));
     }
 
-    private void loadPrograms() {
+    public void loadData() {
         SwingWorker<List<ProgramResponse>, Void> worker = new SwingWorker<>() {
             @Override
             protected List<ProgramResponse> doInBackground() {
@@ -105,11 +134,11 @@ public class ProgramsPanel extends JPanel {
             @Override
             protected void done() {
                 try {
-                    List<ProgramResponse> rows = get();
+                    programList = get();
                     DefaultTableModel model = (DefaultTableModel) programsTable.getModel();
                     model.setRowCount(0);
-                    if (rows != null) {
-                        rows.forEach(p -> model.addRow(new Object[]{p.programId(), p.programDesc(), p.programType(), p.duration()}));
+                    if (programList != null) {
+                        programList.forEach(p -> model.addRow(new Object[]{p.programId(), p.programDesc(), p.programType(), p.duration()}));
                     }
                 } catch (Exception e) {
                     LOGGER.log(Level.SEVERE, "Failed to update program table", e);
@@ -126,13 +155,7 @@ public class ProgramsPanel extends JPanel {
             return;
         }
 
-        ProgramResponse program = new ProgramResponse(
-            (String) programsTable.getValueAt(row, 0),
-            (String) programsTable.getValueAt(row, 1),
-            (String) programsTable.getValueAt(row, 2),
-            (Integer) programsTable.getValueAt(row, 3)
-        );
-
+        ProgramResponse program = programList.get(row);
         JPanel updatePanel = new UpdateProgramPanel(admin, this::showListAndRefresh, program);
         mainPanel.add(updatePanel, "updateProgram");
         cardLayout.show(mainPanel, "updateProgram");
@@ -163,7 +186,7 @@ public class ProgramsPanel extends JPanel {
             }
             @Override
             protected void done() {
-                loadPrograms();
+                loadData();
             }
         };
         worker.execute();

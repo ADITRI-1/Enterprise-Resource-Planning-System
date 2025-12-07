@@ -24,9 +24,6 @@ public class Room {
     @Column(name = "room_id")
     private String roomId;
 
-    @Column(name = "room_number", nullable = false, unique = true, length = 20)
-    private String roomNumber;
-
     @Column(nullable = false, length = 100)
     private String building;
 

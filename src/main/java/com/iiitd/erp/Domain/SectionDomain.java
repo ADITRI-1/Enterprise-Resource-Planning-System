@@ -5,6 +5,7 @@ import lombok.Data;
 import lombok.With;
 
 import java.time.LocalDate;
+import java.util.UUID;
 
 @Data
 @Builder
@@ -12,7 +13,7 @@ import java.time.LocalDate;
 public class SectionDomain {
     private String sectionId;
     private String courseId;
-    private String instructorId;
+    private UUID instructorId;
     private String instructorCode;
     private String semester;
     private Integer year;

@@ -9,7 +9,6 @@ import lombok.With;
 @With
 public class RoomDomain {
     private String roomId;
-    private String roomNumber;
     private String building;
     private Integer capacity;
     private String type;

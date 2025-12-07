@@ -8,7 +8,7 @@ import lombok.extern.jackson.Jacksonized;
 @Jacksonized
 @With
 public record RoomCreateRequest(
-        String roomNumber,
+        String roomId,
         String building,
         Integer capacity,
         String type

@@ -562,10 +562,10 @@ public class AdminController {
                     .roomDomainToResponse(roomService.createRoom(domain));
             return ResponseEntity.status(HttpStatus.CREATED).body(response);
         } catch (ErpException ex) {
-            LOGGER.error("Business error while creating room {}: {}", request.roomNumber(), ex.getErrorCode().getCode(), ex);
+            LOGGER.error("Business error while creating room {}: {}", request.roomId(), ex.getErrorCode().getCode(), ex);
             return from(ex);
         } catch (Exception ex) {
-            LOGGER.error("Unexpected error while creating room {}", request.roomNumber(), ex);
+            LOGGER.error("Unexpected error while creating room {}", request.roomId(), ex);
             return error(HttpStatus.INTERNAL_SERVER_ERROR, ErrorCode.ROOM_CREATE_FAILED);
         }
     }
@@ -696,6 +696,28 @@ public class AdminController {
             return ResponseEntity.ok(DOMAIN_TO_RESPONSE_MAPPER_INSTANCE.sectionDomainToResponse(updated));
         } catch (ErpException ex) {
             return from(ex);
+        }
+    }
+
+    @GetMapping("/sections")
+    public ResponseEntity<?> listAllSections(@RequestParam(required = false) String semester,
+                                             @RequestParam(required = false) Integer year) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (!isAdmin(auth)) {
+            LOGGER.warn("Unauthorized attempt to list all sections by {}", auth != null ? auth.getName() : "anonymous");
+            return error(HttpStatus.FORBIDDEN, ErrorCode.ADMIN_FORBIDDEN);
+        }
+        try {
+            List<SectionResponse> response = sectionService.listAllSections(semester, year).stream()
+                    .map(DOMAIN_TO_RESPONSE_MAPPER_INSTANCE::sectionDomainToResponse)
+                    .toList();
+            return ResponseEntity.ok(response);
+        } catch (ErpException ex) {
+            LOGGER.error("Business error while listing sections: {}", ex.getErrorCode().getCode(), ex);
+            return from(ex);
+        } catch (Exception ex) {
+            LOGGER.error("Unexpected error while listing sections", ex);
+            return error(HttpStatus.INTERNAL_SERVER_ERROR, ErrorCode.SECTION_LIST_FAILED);
         }
     }
 

@@ -1,12 +1,13 @@
 package com.iiitd.erp.ui;
 
+import com.iiitd.erp.io.dto.response.MaintenanceStatusResponse;
 import com.iiitd.erp.ui.client.AdminClient;
-
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.logging.Level;
 import java.util.logging.Logger;
 
 public class AdminDashboardExact extends JFrame {
@@ -17,11 +18,14 @@ public class AdminDashboardExact extends JFrame {
     private final CardLayout cardLayout = new CardLayout();
     private final JPanel mainContentPanel = new JPanel(cardLayout);
     private final LeftRail leftRail;
+    
+    private final Map<String, JPanel> panels = new HashMap<>();
+    private JCheckBox maintenanceModeBox;
+    private final boolean isMaintenanceMode;
 
     public static void main(String[] args) {
         SwingUtilities.invokeLater(() -> {
             try {
-                // For better font rendering
                 System.setProperty("awt.useSystemAAFontSettings", "on");
                 System.setProperty("swing.aatext", "true");
             } catch (Exception ignored) {}
@@ -29,10 +33,11 @@ public class AdminDashboardExact extends JFrame {
         });
     }
 
-    public AdminDashboardExact() { this(null); }
+    public AdminDashboardExact() { this(null, false); }
 
-    public AdminDashboardExact(AdminClient admin) {
+    public AdminDashboardExact(AdminClient admin, boolean maintenanceMode) {
         this.admin = admin;
+        this.isMaintenanceMode = maintenanceMode;
         this.leftRail = new LeftRail();
         LOGGER.info("Admin dashboard initialized with new design");
 
@@ -49,11 +54,21 @@ public class AdminDashboardExact extends JFrame {
         // Set initial view
         cardLayout.show(mainContentPanel, "Dashboard");
         leftRail.setSelected("Dashboard");
+        
+        if (admin != null) {
+            fetchMaintenanceStatus();
+        }
     }
 
     private JComponent buildHeader() {
         JPanel header = new JPanel(new BorderLayout());
         header.add(new HeaderBar(), BorderLayout.CENTER);
+
+        maintenanceModeBox = new JCheckBox("Maintenance Mode");
+        maintenanceModeBox.setFont(new Font("Segoe UI", Font.BOLD, 14));
+        maintenanceModeBox.setOpaque(false);
+        maintenanceModeBox.addActionListener(e -> toggleMaintenanceMode());
+        maintenanceModeBox.setEnabled(!isMaintenanceMode); // Disable if in maintenance mode
 
         JButton logout = new JButton("Logout");
         logout.setFont(new Font("Segoe UI", Font.BOLD, 14));
@@ -67,6 +82,7 @@ public class AdminDashboardExact extends JFrame {
 
         JPanel right = new JPanel(new FlowLayout(FlowLayout.RIGHT, 15, 15));
         right.setOpaque(false);
+        right.add(maintenanceModeBox);
         right.add(logout);
 
         header.add(right, BorderLayout.EAST);
@@ -78,16 +94,20 @@ public class AdminDashboardExact extends JFrame {
         JPanel mainPanel = new JPanel(new BorderLayout());
         mainPanel.setBackground(new Color(245, 248, 251));
 
-        // Setup main content area with different panels
         mainContentPanel.setOpaque(false);
-        mainContentPanel.add(new DashboardPanel(), "Dashboard");
-        mainContentPanel.add(new UsersPanel(admin), "Users");
-        mainContentPanel.add(new CoursesPanel(admin), "Courses");
-        mainContentPanel.add(new ProgramsPanel(admin), "Programs");
-        mainContentPanel.add(new DepartmentsPanel(admin), "Departments");
-        mainContentPanel.add(new RoomsPanel(admin), "Rooms");
-        mainContentPanel.add(new SectionsPanel(admin), "Sections");
-        mainContentPanel.add(new SchedulePanel(admin), "Class Schedule");
+        
+        panels.put("Dashboard", new DashboardPanel());
+        panels.put("Users", new UsersPanel(admin, isMaintenanceMode));
+        panels.put("Courses", new CoursesPanel(admin, isMaintenanceMode));
+        panels.put("Programs", new ProgramsPanel(admin, isMaintenanceMode));
+        panels.put("Departments", new DepartmentsPanel(admin, isMaintenanceMode));
+        panels.put("Rooms", new RoomsPanel(admin, isMaintenanceMode));
+        panels.put("Sections", new SectionsPanel(admin, isMaintenanceMode));
+        panels.put("Class Schedule", new SchedulePanel(admin, isMaintenanceMode));
+
+        for (Map.Entry<String, JPanel> entry : panels.entrySet()) {
+            mainContentPanel.add(entry.getValue(), entry.getKey());
+        }
 
         mainPanel.add(new SlidingPanel(leftRail), BorderLayout.WEST);
         mainPanel.add(mainContentPanel, BorderLayout.CENTER);
@@ -96,11 +116,76 @@ public class AdminDashboardExact extends JFrame {
 
     private void showView(String viewName) {
         LOGGER.info("Switching to view: " + viewName);
+        
+        JPanel panel = panels.get(viewName);
+        // The refresh logic can be simplified if each panel handles its own data loading
+        // For now, this explicit check remains.
+        if (panel instanceof UsersPanel) {
+            ((UsersPanel) panel).loadData();
+        } else if (panel instanceof CoursesPanel) {
+             ((CoursesPanel) panel).loadData();
+        } else if (panel instanceof ProgramsPanel) {
+             ((ProgramsPanel) panel).loadData();
+        } else if (panel instanceof DepartmentsPanel) {
+             ((DepartmentsPanel) panel).loadData();
+        } else if (panel instanceof RoomsPanel) {
+             ((RoomsPanel) panel).loadData();
+        } else if (panel instanceof SectionsPanel) {
+             ((SectionsPanel) panel).loadData();
+        }
+
         cardLayout.show(mainContentPanel, viewName);
         leftRail.setSelected(viewName);
     }
+    
+    private void fetchMaintenanceStatus() {
+        SwingWorker<MaintenanceStatusResponse, Void> worker = new SwingWorker<>() {
+            @Override
+            protected MaintenanceStatusResponse doInBackground() throws Exception {
+                return admin.maintenanceStatus();
+            }
+            @Override
+            protected void done() {
+                try {
+                    MaintenanceStatusResponse status = get();
+                    maintenanceModeBox.setSelected(status.maintenanceOn());
+                } catch (Exception e) {
+                    LOGGER.log(Level.SEVERE, "Failed to fetch maintenance status", e);
+                }
+            }
+        };
+        worker.execute();
+    }
 
-    // ---------- Initial Dashboard View ----------
+    private void toggleMaintenanceMode() {
+        boolean isEnabled = maintenanceModeBox.isSelected();
+        SwingWorker<Void, Void> worker = new SwingWorker<>() {
+            @Override
+            protected Void doInBackground() throws Exception {
+                admin.toggleMaintenance(isEnabled);
+                return null;
+            }
+            @Override
+            protected void done() {
+                try {
+                    get(); // To catch any exceptions
+                    JOptionPane.showMessageDialog(AdminDashboardExact.this,
+                            "Maintenance mode is now " + (isEnabled ? "ON" : "OFF") + ". Please restart the application to see changes.",
+                            "Status Updated", JOptionPane.INFORMATION_MESSAGE);
+                } catch (Exception e) {
+                    LOGGER.log(Level.SEVERE, "Failed to toggle maintenance mode", e);
+                    JOptionPane.showMessageDialog(AdminDashboardExact.this,
+                            "Failed to update maintenance status: " + e.getMessage(),
+                            "Error", JOptionPane.ERROR_MESSAGE);
+                    maintenanceModeBox.setSelected(!isEnabled);
+                }
+            }
+        };
+        worker.execute();
+    }
+
+    // ---------- Inner classes (DashboardPanel, LeftRail, etc.) remain the same ----------
+
     class DashboardPanel extends JPanel {
         DashboardPanel() {
             setOpaque(false);
@@ -165,7 +250,6 @@ public class AdminDashboardExact extends JFrame {
         }
     }
 
-    // ---------- Left Navigation Rail ----------
     class LeftRail extends JPanel {
         private final Map<String, JPanel> navButtons = new HashMap<>();
 
@@ -174,17 +258,15 @@ public class AdminDashboardExact extends JFrame {
             setBackground(new Color(245, 248, 251));
             setLayout(new BorderLayout());
 
-            // Profile Card
             JPanel profileCard = createProfileCard();
             add(margin(profileCard, 16, 16, 0, 16), BorderLayout.NORTH);
 
-            // Navigation Buttons
             JPanel navPanel = new JPanel();
             navPanel.setOpaque(false);
             navPanel.setLayout(new BoxLayout(navPanel, BoxLayout.Y_AXIS));
 
             String[] navItems = {"Dashboard", "Users", "Courses", "Programs", "Departments", "Rooms", "Sections", "Class Schedule"};
-            char[] icons = {'\uE80F', '\uE716', '\uE7BE', '\uE71D', '\uE71D', '\uE740', '\uE716', '\uE787'}; // Example icons
+            char[] icons = {'\uE80F', '\uE716', '\uE7BE', '\uE71D', '\uE71D', '\uE740', '\uE716', '\uE787'};
 
             for (int i = 0; i < navItems.length; i++) {
                 String item = navItems[i];
@@ -234,7 +316,7 @@ public class AdminDashboardExact extends JFrame {
 
         private JPanel createNavButton(String text, char icon, Runnable action) {
             JPanel p = new JPanel(new BorderLayout());
-            p.setOpaque(true); // To show background color
+            p.setOpaque(true);
             p.setBackground(Color.WHITE);
             p.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
             p.setBorder(new EmptyBorder(10, 16, 10, 16));
@@ -269,9 +351,7 @@ public class AdminDashboardExact extends JFrame {
             return p;
         }
     }
-
-    // ---------- UI Components (Header, Footer, etc.) ----------
-    static class HeaderBar extends JPanel { /* ... same as before ... */ 
+    static class HeaderBar extends JPanel { 
         HeaderBar() { setPreferredSize(new Dimension(0, 64)); }
         @Override protected void paintComponent(Graphics g) {
             super.paintComponent(g);
@@ -293,7 +373,7 @@ public class AdminDashboardExact extends JFrame {
             g2.dispose();
         }
     }
-    static class FooterBar extends JPanel { /* ... same as before ... */
+    static class FooterBar extends JPanel {
         private final Color NAVY = new Color(9, 53, 82);
         FooterBar() { setPreferredSize(new Dimension(0, 54)); }
         @Override protected void paintComponent(Graphics g) {
@@ -306,7 +386,7 @@ public class AdminDashboardExact extends JFrame {
             for (String s : items) { g2.drawString(s, x, y); x += g2.getFontMetrics().stringWidth(s) + gap; }
         }
     }
-    static class SlidingPanel extends JPanel { /* ... same as before ... */
+    static class SlidingPanel extends JPanel {
         private final JPanel content;
         private final ArrowIndicator arrow;
         private final int expandedWidth = 320;
@@ -402,7 +482,7 @@ public class AdminDashboardExact extends JFrame {
             }
         }
     }
-    static class Avatar extends JComponent { /* ... same as before ... */
+    static class Avatar extends JComponent {
         private final String letter;
         Avatar(String letter) { this.letter = letter; setPreferredSize(new Dimension(120, 120)); }
         @Override protected void paintComponent(Graphics g) {

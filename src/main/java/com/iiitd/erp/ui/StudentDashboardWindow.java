@@ -14,9 +14,11 @@ public class StudentDashboardWindow extends JFrame {
 
     private final static Logger LOGGER = Logger.getLogger(StudentDashboardWindow.class.getName());
     private final StudentClient client;
+    private final boolean isMaintenanceMode;
 
-    public StudentDashboardWindow(StudentClient client) {
+    public StudentDashboardWindow(StudentClient client, boolean maintenanceMode) {
         this.client = client;
+        this.isMaintenanceMode = maintenanceMode;
         LOGGER.info("StudentDashboardWindow initialized");
         setTitle("Student Dashboard");
         setSize(1280, 760);
@@ -37,10 +39,6 @@ public class StudentDashboardWindow extends JFrame {
         setVisible(true);
     }
 
-    /* ---------------------------------------------------------------------- */
-    /* HEADER (With IIIT-D logo, same as other windows)                       */
-    /* ---------------------------------------------------------------------- */
-
     static class HeaderBar extends JPanel {
         HeaderBar() {
             setPreferredSize(new Dimension(0, 90));
@@ -52,25 +50,22 @@ public class StudentDashboardWindow extends JFrame {
             Graphics2D g2 = (Graphics2D) g;
             g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
 
-            g2.setColor(new Color(9, 53, 82)); // blue bar
+            g2.setColor(new Color(9, 53, 82));
             g2.fillRect(0, 0, getWidth(), getHeight());
 
             int cy = getHeight() / 2;
             int x = 26;
 
-            // IIITD Logo bars
             g2.setColor(Color.WHITE);
             for (int i = 0; i < 4; i++) {
                 g2.fillRoundRect(x, cy - 22, 10, 44, 6, 6);
                 x += 20;
             }
 
-            // Half arc
             g2.setColor(new Color(85, 172, 168));
             g2.setStroke(new BasicStroke(8f));
             g2.drawArc(x - 20, cy - 21, 42, 42, -90, 180);
 
-            // Institute text
             g2.setFont(new Font("Segoe UI", Font.BOLD, 20));
             g2.setColor(Color.WHITE);
             g2.drawString("INDRAPRASTHA INSTITUTE of", x + 50, cy - 6);
@@ -84,10 +79,6 @@ public class StudentDashboardWindow extends JFrame {
                     cy + 20);
         }
     }
-
-    /* ---------------------------------------------------------------------- */
-    /* SLIDING PANEL                                                          */
-    /* ---------------------------------------------------------------------- */
 
     static class SlidingPanel extends JPanel {
 
@@ -203,10 +194,6 @@ public class StudentDashboardWindow extends JFrame {
         }
     }
 
-    /* ---------------------------------------------------------------------- */
-    /* LEFT RAIL WITH AVATAR + STUDENT RIBBON + NAV BUTTONS                   */
-    /* ---------------------------------------------------------------------- */
-
     class LeftRail extends JPanel {
         private JLabel studentNameLabel;
         private JLabel studentIdLabel;
@@ -219,11 +206,9 @@ public class StudentDashboardWindow extends JFrame {
 
             add(Box.createVerticalStrut(20));
 
-            // ⇩ NEW Circular S Avatar
             add(center(new Avatar("S")));
             add(Box.createVerticalStrut(10));
 
-            // ⇩ Student Ribbon
             add(center(studentRibbon()));
             add(Box.createVerticalStrut(25));
 
@@ -233,8 +218,8 @@ public class StudentDashboardWindow extends JFrame {
             });
             nav("Register Courses", e -> {
                 LOGGER.info("Navigating to RegisterCoursesWindow");
-                new RegisterCoursesWindow(client).setVisible(true);
-            });
+                new RegisterCoursesWindow(client,false).setVisible(true);
+            }).setEnabled(!isMaintenanceMode);
             nav("My Timetable", e -> {
                 LOGGER.info("Navigating to MyTimetableWindow");
                 new MyTimetableWindow(client).setVisible(true);
@@ -295,7 +280,7 @@ public class StudentDashboardWindow extends JFrame {
             return p;
         }
 
-        private void nav(String text, ActionListener al) {
+        private JButton nav(String text, ActionListener al) {
             JButton b = new JButton(text);
             b.setFont(new Font("Segoe UI", Font.PLAIN, 17));
             b.setBackground(Color.WHITE);
@@ -313,6 +298,7 @@ public class StudentDashboardWindow extends JFrame {
             p.add(b);
 
             add(p);
+            return b;
         }
 
         static class Avatar extends JComponent {
@@ -345,10 +331,6 @@ public class StudentDashboardWindow extends JFrame {
         }
     }
 
-    /* ---------------------------------------------------------------------- */
-    /* DASHBOARD CENTER AREA (Blue cards instead of white)                    */
-    /* ---------------------------------------------------------------------- */
-
     class DashboardArea extends JPanel {
 
         DashboardArea() {
@@ -377,8 +359,8 @@ public class StudentDashboardWindow extends JFrame {
             row1.add(card("REGISTER COURSES", "Browse and add courses",
                     () -> {
                         LOGGER.info("Navigating to RegisterCoursesWindow");
-                        new RegisterCoursesWindow(client).setVisible(true);
-                    }));
+                        new RegisterCoursesWindow(client,false).setVisible(true);
+                    })).setEnabled(!isMaintenanceMode);
 
             JPanel row2 = new JPanel();
             row2.setOpaque(false);
@@ -402,7 +384,7 @@ public class StudentDashboardWindow extends JFrame {
 
         private JPanel card(String title, String desc, Runnable onClick) {
 
-            Color cardBlue = new Color(72, 121, 231);   // EXACT blue shade
+            Color cardBlue = new Color(72, 121, 231);
 
             JPanel c = new JPanel();
             c.setBackground(Color.WHITE);
@@ -429,6 +411,7 @@ public class StudentDashboardWindow extends JFrame {
             b.setFocusPainted(false);
             b.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
             b.addActionListener(e -> onClick.run());
+            b.setEnabled(!isMaintenanceMode);
 
             b.setBorder(new EmptyBorder(8, 12, 8, 12));
 
@@ -443,10 +426,6 @@ public class StudentDashboardWindow extends JFrame {
             return c;
         }
     }
-
-    /* ---------------------------------------------------------------------- */
-    /* FOOTER                                                                 */
-    /* ---------------------------------------------------------------------- */
 
     static class FooterBar extends JPanel {
         FooterBar() { setPreferredSize(new Dimension(0, 60)); }
@@ -469,6 +448,6 @@ public class StudentDashboardWindow extends JFrame {
         }
     }
     public static void main(String[] args) {
-        SwingUtilities.invokeLater(() -> new StudentDashboardWindow(null).setVisible(true));
+        SwingUtilities.invokeLater(() -> new StudentDashboardWindow(null, false).setVisible(true));
     }
 }

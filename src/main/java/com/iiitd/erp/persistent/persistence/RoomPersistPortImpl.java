@@ -31,27 +31,12 @@ public class RoomPersistPortImpl implements RoomPersistPort {
     }
 
     @Override
-    public RoomDomain findByRoomNumber(String roomNumber) {
-        LOGGER.debug("Fetching room by number {}", roomNumber);
-        try {
-            return roomRepository.findByRoomNumber(roomNumber)
-                    .map(ENTITY_TO_DOMAIN_MAPPER_INSTANCE::roomToRoomDomain)
-                    .orElse(null);
-        } catch (Exception ex) {
-            LOGGER.error("Failed to fetch room {}", roomNumber, ex);
-            throw ErpException.wrap(ErrorCode.ROOM_FETCH_FAILED, ex, Map.of("roomNumber", roomNumber));
-        }
-    }
-
-    @Override
     public RoomDomain findByRoomId(String roomId) {
-        LOGGER.debug("Fetching room by id {}", roomId);
+        LOGGER.debug("Fetching room by number {}", roomId);
         try {
-            return roomRepository.findById(roomId)
+            return roomRepository.findByRoomId(roomId)
                     .map(ENTITY_TO_DOMAIN_MAPPER_INSTANCE::roomToRoomDomain)
                     .orElse(null);
-        } catch (IllegalArgumentException ex) {
-            throw ErpException.of(ErrorCode.ROOM_NOT_FOUND, Map.of("roomId", roomId));
         } catch (Exception ex) {
             LOGGER.error("Failed to fetch room {}", roomId, ex);
             throw ErpException.wrap(ErrorCode.ROOM_FETCH_FAILED, ex, Map.of("roomId", roomId));
@@ -60,15 +45,15 @@ public class RoomPersistPortImpl implements RoomPersistPort {
 
     @Override
     public RoomDomain save(RoomDomain roomDomain) {
-        LOGGER.debug("Persisting room {}", roomDomain.getRoomNumber());
+        LOGGER.debug("Persisting room {}", roomDomain.getRoomId());
         try {
             Room entity = DOMAIN_TO_ENTITY_MAPPER_INSTANCE.roomDomainToRoom(roomDomain);
             Room saved = roomRepository.save(entity);
-            LOGGER.info("Persisted room {}", roomDomain.getRoomNumber());
+            LOGGER.info("Persisted room {}", roomDomain.getRoomId());
             return ENTITY_TO_DOMAIN_MAPPER_INSTANCE.roomToRoomDomain(saved);
         } catch (Exception ex) {
-            LOGGER.error("Failed to persist room {}", roomDomain.getRoomNumber(), ex);
-            throw ErpException.wrap(ErrorCode.ROOM_CREATE_FAILED, ex, Map.of("roomNumber", roomDomain.getRoomNumber()));
+            LOGGER.error("Failed to persist room {}", roomDomain.getRoomId(), ex);
+            throw ErpException.wrap(ErrorCode.ROOM_CREATE_FAILED, ex, Map.of("roomId", roomDomain.getRoomId()));
         }
     }
 

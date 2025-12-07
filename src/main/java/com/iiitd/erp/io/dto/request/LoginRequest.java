@@ -1,6 +1,7 @@
 package com.iiitd.erp.io.dto.request;
 
 
+import jakarta.validation.constraints.NotBlank;
 import lombok.Builder;
 import lombok.With;
 import lombok.extern.jackson.Jacksonized;
@@ -9,6 +10,7 @@ import lombok.extern.jackson.Jacksonized;
 @Jacksonized
 @With
 public record LoginRequest (
-    String username,
-    String password
+    @NotBlank String username,
+    @NotBlank String password,
+    @NotBlank String role
 ){}

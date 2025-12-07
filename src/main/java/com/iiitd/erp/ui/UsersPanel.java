@@ -8,6 +8,7 @@ import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -18,10 +19,14 @@ public class UsersPanel extends JPanel {
     private final CardLayout cardLayout = new CardLayout();
     private final JPanel mainPanel = new JPanel(cardLayout);
     private JTable studentTable, instructorTable;
+    private List<StudentResponse> studentList = new ArrayList<>();
+    private List<InstructorResponse> instructorList = new ArrayList<>();
     private final static Logger LOGGER = Logger.getLogger(UsersPanel.class.getName());
+    private final boolean isMaintenanceMode;
 
-    public UsersPanel(AdminClient admin) {
+    public UsersPanel(AdminClient admin, boolean maintenanceMode) {
         this.admin = admin;
+        this.isMaintenanceMode = maintenanceMode;
         setOpaque(false);
         setLayout(new BorderLayout());
         setBorder(new EmptyBorder(10, 20, 10, 20));
@@ -51,9 +56,16 @@ public class UsersPanel extends JPanel {
         cardLayout.show(mainPanel, "list");
     }
 
-    private void loadData() {
+    public void loadData() {
         loadStudents();
         loadInstructors();
+    }
+
+    private void showMaintenanceMessage() {
+        JOptionPane.showMessageDialog(this,
+                "Action disabled: The application is currently in maintenance mode.",
+                "Maintenance Mode",
+                JOptionPane.INFORMATION_MESSAGE);
     }
 
     private JPanel createListUsersPanel() {
@@ -72,7 +84,7 @@ public class UsersPanel extends JPanel {
         panel.setOpaque(false);
         panel.setBorder(new EmptyBorder(10, 10, 10, 10));
 
-        studentTable = new JTable(new DefaultTableModel(new Object[]{"Roll", "Name", "Program", "Year"}, 0));
+        studentTable = new JTable(new DefaultTableModel(new Object[]{"Roll", "Name", "Program", "Year", "DOB"}, 0));
         styleTable(studentTable);
         
         panel.add(new JScrollPane(studentTable), BorderLayout.CENTER);
@@ -85,7 +97,7 @@ public class UsersPanel extends JPanel {
         panel.setOpaque(false);
         panel.setBorder(new EmptyBorder(10, 10, 10, 10));
 
-        instructorTable = new JTable(new DefaultTableModel(new Object[]{"Code", "Name", "Dept"}, 0));
+        instructorTable = new JTable(new DefaultTableModel(new Object[]{"Code", "Name", "Dept", "DOB", "Email", "Phone"}, 0));
         styleTable(instructorTable);
 
         panel.add(new JScrollPane(instructorTable), BorderLayout.CENTER);
@@ -99,11 +111,21 @@ public class UsersPanel extends JPanel {
 
         JButton addButton = new JButton("Add New " + type);
         stylePrimaryButton(addButton);
-        addButton.addActionListener(e -> cardLayout.show(mainPanel, "create" + type));
+        addButton.addActionListener(e -> {
+            if (isMaintenanceMode) {
+                showMaintenanceMessage();
+                return;
+            }
+            cardLayout.show(mainPanel, "create" + type);
+        });
 
         JButton editButton = new JButton("Edit Selected");
         styleSecondaryButton(editButton);
         editButton.addActionListener(e -> {
+            if (isMaintenanceMode) {
+                showMaintenanceMessage();
+                return;
+            }
             if (type.equals("Student")) showUpdateStudentPanel();
             else showUpdateInstructorPanel();
         });
@@ -111,6 +133,10 @@ public class UsersPanel extends JPanel {
         JButton deleteButton = new JButton("Delete Selected");
         styleDeleteButton(deleteButton);
         deleteButton.addActionListener(e -> {
+            if (isMaintenanceMode) {
+                showMaintenanceMessage();
+                return;
+            }
             if (type.equals("Student")) deleteStudent();
             else deleteInstructor();
         });
@@ -144,11 +170,11 @@ public class UsersPanel extends JPanel {
             @Override
             protected void done() {
                 try {
-                    List<StudentResponse> rows = get();
+                    studentList = get();
                     DefaultTableModel model = (DefaultTableModel) studentTable.getModel();
                     model.setRowCount(0);
-                    if (rows != null) {
-                        rows.forEach(s -> model.addRow(new Object[]{s.rollNo(), s.name(), s.programId(), s.yearOfRegistration()}));
+                    if (studentList != null) {
+                        studentList.forEach(s -> model.addRow(new Object[]{s.rollNo(), s.name(), s.programId(), s.yearOfRegistration(), s.dateOfBirth()}));
                     }
                 } catch (Exception e) {
                     LOGGER.log(Level.SEVERE, "Failed to update student table", e);
@@ -174,11 +200,11 @@ public class UsersPanel extends JPanel {
             @Override
             protected void done() {
                 try {
-                    List<InstructorResponse> rows = get();
+                    instructorList = get();
                     DefaultTableModel model = (DefaultTableModel) instructorTable.getModel();
                     model.setRowCount(0);
-                    if (rows != null) {
-                        rows.forEach(i -> model.addRow(new Object[]{i.instructorCode(), i.name(), i.deptId()}));
+                    if (instructorList != null) {
+                        instructorList.forEach(i -> model.addRow(new Object[]{i.instructorCode(), i.name(), i.deptId(), i.dateOfBirth(), i.email(), i.phone()}));
                     }
                 } catch (Exception e) {
                     LOGGER.log(Level.SEVERE, "Failed to update instructor table", e);
@@ -194,14 +220,8 @@ public class UsersPanel extends JPanel {
             JOptionPane.showMessageDialog(this, "Please select a student to update.", "No Selection", JOptionPane.WARNING_MESSAGE);
             return;
         }
-
-        StudentResponse student = StudentResponse.builder()
-                .rollNo((Integer) studentTable.getValueAt(row, 0))
-                .name((String) studentTable.getValueAt(row, 1))
-                .programId((String) studentTable.getValueAt(row, 2))
-                .yearOfRegistration(studentTable.getValueAt(row, 3).toString())
-                .build();
-
+        
+        StudentResponse student = studentList.get(row);
         JPanel updatePanel = new UpdateStudentPanel(admin, this::showListAndRefresh, student);
         mainPanel.add(updatePanel, "updateStudent");
         cardLayout.show(mainPanel, "updateStudent");
@@ -214,13 +234,7 @@ public class UsersPanel extends JPanel {
             return;
         }
 
-        InstructorResponse instructor = new InstructorResponse(
-            (String) instructorTable.getValueAt(row, 0),
-            (String) instructorTable.getValueAt(row, 1),
-            (String) instructorTable.getValueAt(row, 2),
-            "", "", "" // email, phone not shown in table, but needed for constructor
-        );
-
+        InstructorResponse instructor = instructorList.get(row);
         JPanel updatePanel = new UpdateInstructorPanel(admin, this::showListAndRefresh, instructor);
         mainPanel.add(updatePanel, "updateInstructor");
         cardLayout.show(mainPanel, "updateInstructor");

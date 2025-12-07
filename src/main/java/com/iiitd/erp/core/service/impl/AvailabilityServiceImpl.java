@@ -51,12 +51,11 @@ public class AvailabilityServiceImpl implements AvailabilityService {
                                                          LocalTime end,
                                                          int minCapacity) {
         workingHours.ensureWithin(start, end);
-        Weekday weekday = Weekday.from(day);
+        String weekday = Weekday.from(day).name();
         return rooms.findByCapacityGreaterThanEqual(minCapacity).stream()
                 .filter(room -> schedules.roomConflicts(room.getRoomId(), weekday, start, end, null).isEmpty())
                 .map(room -> RoomAvailabilityResponse.builder()
                         .roomId(room.getRoomId())
-                        .roomName(room.getRoomNumber())
                         .capacity(room.getCapacity())
                         .build())
                 .toList();
@@ -95,7 +94,7 @@ public class AvailabilityServiceImpl implements AvailabilityService {
                                LocalTime start,
                                LocalTime end) {
         workingHours.ensureWithin(start, end);
-        Weekday weekday = Weekday.from(day);
+        String weekday = Weekday.from(day).name();
 
         if (!schedules.roomConflicts(roomId, weekday, start, end, sectionIdToIgnore).isEmpty()) {
             LOGGER.warn("Room conflict for {} {} {}-{}", roomId, day, start, end);

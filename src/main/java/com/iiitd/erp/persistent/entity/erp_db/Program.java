@@ -26,7 +26,7 @@ public class Program {
     private String programDesc;
 
     @Column(name = "program_type", nullable = false, length = 100)
-    private String program_type;
+    private String programType;
 
     @Column(name = "duration")
     private Integer duration;

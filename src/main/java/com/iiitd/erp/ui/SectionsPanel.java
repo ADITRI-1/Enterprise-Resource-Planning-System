@@ -7,6 +7,7 @@ import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -17,10 +18,13 @@ public class SectionsPanel extends JPanel {
     private final CardLayout cardLayout = new CardLayout();
     private final JPanel mainPanel = new JPanel(cardLayout);
     private JTable sectionsTable;
+    private List<SectionResponse> sectionList = new ArrayList<>();
     private static final Logger LOGGER = Logger.getLogger(SectionsPanel.class.getName());
+    private final boolean isMaintenanceMode;
 
-    public SectionsPanel(AdminClient admin) {
+    public SectionsPanel(AdminClient admin, boolean maintenanceMode) {
         this.admin = admin;
+        this.isMaintenanceMode = maintenanceMode;
         setOpaque(false);
         setLayout(new BorderLayout());
         setBorder(new EmptyBorder(10, 20, 10, 20));
@@ -40,19 +44,26 @@ public class SectionsPanel extends JPanel {
         mainPanel.add(createSectionPanel, "create");
 
         cardLayout.show(mainPanel, "list");
-        loadSections();
+        loadData();
     }
 
     private void showListAndRefresh() {
-        loadSections();
+        loadData();
         cardLayout.show(mainPanel, "list");
+    }
+    
+    private void showMaintenanceMessage() {
+        JOptionPane.showMessageDialog(this,
+                "Action disabled: The application is currently in maintenance mode.",
+                "Maintenance Mode",
+                JOptionPane.INFORMATION_MESSAGE);
     }
 
     private JPanel createListSectionsPanel() {
         JPanel panel = new JPanel(new BorderLayout(10, 10));
         panel.setOpaque(false);
 
-        sectionsTable = new JTable(new DefaultTableModel(new Object[]{"ID", "Course", "Instructor", "Capacity", "Semester", "Year"}, 0));
+        sectionsTable = new JTable(new DefaultTableModel(new Object[]{"ID", "Course", "Instructor", "Semester", "Year", "Capacity"}, 0));
         styleTable(sectionsTable);
 
         panel.add(new JScrollPane(sectionsTable), BorderLayout.CENTER);
@@ -66,15 +77,33 @@ public class SectionsPanel extends JPanel {
 
         JButton addButton = new JButton("Add New Section");
         stylePrimaryButton(addButton);
-        addButton.addActionListener(e -> cardLayout.show(mainPanel, "create"));
+        addButton.addActionListener(e -> {
+            if (isMaintenanceMode) {
+                showMaintenanceMessage();
+                return;
+            }
+            cardLayout.show(mainPanel, "create");
+        });
 
         JButton editButton = new JButton("Edit Selected");
         styleSecondaryButton(editButton);
-        editButton.addActionListener(e -> showUpdateSectionPanel());
+        editButton.addActionListener(e -> {
+            if (isMaintenanceMode) {
+                showMaintenanceMessage();
+                return;
+            }
+            showUpdateSectionPanel();
+        });
 
         JButton deleteButton = new JButton("Delete Selected");
         styleDeleteButton(deleteButton);
-        deleteButton.addActionListener(e -> deleteSection());
+        deleteButton.addActionListener(e -> {
+            if (isMaintenanceMode) {
+                showMaintenanceMessage();
+                return;
+            }
+            deleteSection();
+        });
 
         buttonPanel.add(addButton);
         buttonPanel.add(editButton);
@@ -89,7 +118,7 @@ public class SectionsPanel extends JPanel {
         table.getTableHeader().setBackground(new Color(240, 240, 240));
     }
 
-    private void loadSections() {
+    public void loadData() {
         SwingWorker<List<SectionResponse>, Void> worker = new SwingWorker<>() {
             @Override
             protected List<SectionResponse> doInBackground() {
@@ -105,11 +134,11 @@ public class SectionsPanel extends JPanel {
             @Override
             protected void done() {
                 try {
-                    List<SectionResponse> rows = get();
+                    sectionList = get();
                     DefaultTableModel model = (DefaultTableModel) sectionsTable.getModel();
                     model.setRowCount(0);
-                    if (rows != null) {
-                        rows.forEach(s -> model.addRow(new Object[]{s.sectionId(), s.courseId(), s.instructorCode(), s.capacity(), s.semester(), s.year()}));
+                    if (sectionList != null) {
+                        sectionList.forEach(s -> model.addRow(new Object[]{s.sectionId(), s.courseId(), s.instructorCode(), s.semester(), s.year(), s.capacity()}));
                     }
                 } catch (Exception e) {
                     LOGGER.log(Level.SEVERE, "Failed to update section table", e);
@@ -126,17 +155,7 @@ public class SectionsPanel extends JPanel {
             return;
         }
 
-        SectionResponse section = SectionResponse.builder()
-                .sectionId((String) sectionsTable.getValueAt(row, 0))
-                .courseId((String) sectionsTable.getValueAt(row, 1))
-                .instructorCode((String) sectionsTable.getValueAt(row, 2))
-                .capacity((Integer) sectionsTable.getValueAt(row, 3))
-                .semester((String) sectionsTable.getValueAt(row, 4))
-                .year((Integer) sectionsTable.getValueAt(row, 5))
-                .build();
-
-
-
+        SectionResponse section = sectionList.get(row);
         JPanel updatePanel = new UpdateSectionPanel(admin, this::showListAndRefresh, section);
         mainPanel.add(updatePanel, "updateSection");
         cardLayout.show(mainPanel, "updateSection");
@@ -167,7 +186,7 @@ public class SectionsPanel extends JPanel {
             }
             @Override
             protected void done() {
-                loadSections();
+                loadData();
             }
         };
         worker.execute();

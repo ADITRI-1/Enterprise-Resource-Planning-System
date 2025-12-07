@@ -8,6 +8,8 @@ import com.iiitd.erp.ui.client.AdminClient;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -22,6 +24,7 @@ public class UpdateStudentPanel extends JPanel {
     private final JTextField nameField;
     private final JComboBox<ProgramResponse> programIdField = new JComboBox<>();
     private final JTextField yearField;
+    private final JTextField dobField;
 
     public UpdateStudentPanel(AdminClient admin, Runnable onBack, StudentResponse student) {
         this.admin = admin;
@@ -40,13 +43,11 @@ public class UpdateStudentPanel extends JPanel {
                 new EmptyBorder(40, 50, 40, 50)
         ));
 
-        // Header
         JLabel title = new JLabel("Update Student: " + student.name(), SwingConstants.CENTER);
         title.setFont(new Font("Segoe UI", Font.BOLD, 32));
         title.setForeground(new Color(40, 50, 65));
         formContainer.add(title, BorderLayout.NORTH);
 
-        // Form Panel
         JPanel formPanel = new JPanel(new GridBagLayout());
         formPanel.setOpaque(false);
         GridBagConstraints gbc = new GridBagConstraints();
@@ -57,14 +58,25 @@ public class UpdateStudentPanel extends JPanel {
         yearField = new JTextField(student.yearOfRegistration(), 20);
         yearField.setEditable(false);
         yearField.setBackground(new Color(240, 240, 240));
+        
+        String displayDob = "";
+        if (student.dateOfBirth() != null && !student.dateOfBirth().isEmpty()) {
+            try {
+                LocalDate dob = LocalDate.parse(student.dateOfBirth(), DateTimeFormatter.ISO_LOCAL_DATE);
+                displayDob = dob.format(DateTimeFormatter.ofPattern("dd-MM-yyyy"));
+            } catch (Exception e) {
+                displayDob = student.dateOfBirth(); // Fallback to original string if parsing fails
+            }
+        }
+        dobField = new JTextField(displayDob, 20);
 
         addField(formPanel, gbc, 0, "Full Name:", nameField);
         addField(formPanel, gbc, 1, "Program:", programIdField);
         addField(formPanel, gbc, 2, "Year of Registration:", yearField);
+        setupDobField(formPanel, gbc, 3);
 
         formContainer.add(formPanel, BorderLayout.CENTER);
 
-        // Buttons
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 15, 10));
         buttonPanel.setOpaque(false);
 
@@ -90,6 +102,39 @@ public class UpdateStudentPanel extends JPanel {
 
         loadPrograms();
     }
+    
+    private void setupDobField(JPanel panel, GridBagConstraints gbc, int y) {
+        JLabel label = new JLabel("Date of Birth (DD-MM-YYYY):");
+        label.setFont(new Font("Segoe UI", Font.PLAIN, 16));
+        gbc.gridx = 0;
+        gbc.gridy = y;
+        gbc.weightx = 0;
+        panel.add(label, gbc);
+
+        JPanel dobPanel = new JPanel(new BorderLayout(8, 0));
+        dobPanel.setOpaque(false);
+        styleTextField(dobField);
+        dobPanel.add(dobField, BorderLayout.CENTER);
+        
+        JButton dobButton = new JButton("📅");
+        dobButton.setFont(new Font("Segoe UI Symbol", Font.PLAIN, 16));
+        dobButton.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        dobButton.addActionListener(e -> {
+            DatePicker picker = new DatePicker((Frame) SwingUtilities.getWindowAncestor(this));
+            picker.setVisible(true);
+            String selectedDate = picker.getSelectedDateAsString();
+            if (!selectedDate.isEmpty()) {
+                dobField.setText(selectedDate);
+            }
+        });
+        dobPanel.add(dobButton, BorderLayout.EAST);
+
+        gbc.gridx = 1;
+        gbc.gridy = y;
+        gbc.weightx = 1;
+        gbc.fill = GridBagConstraints.HORIZONTAL;
+        panel.add(dobPanel, gbc);
+    }
 
     private void loadPrograms() {
         SwingWorker<List<ProgramResponse>, Void> worker = new SwingWorker<>() {
@@ -103,7 +148,6 @@ public class UpdateStudentPanel extends JPanel {
                     List<ProgramResponse> programs = get();
                     programIdField.removeAllItems();
                     programs.forEach(programIdField::addItem);
-                    // Set the initial selection
                     for (int i = 0; i < programs.size(); i++) {
                         if (programs.get(i).programId().equals(student.programId())) {
                             programIdField.setSelectedIndex(i);
@@ -184,10 +228,20 @@ public class UpdateStudentPanel extends JPanel {
             return;
         }
 
+        String dobForBackend = "";
+        try {
+            LocalDate dob = LocalDate.parse(dobField.getText(), DateTimeFormatter.ofPattern("dd-MM-yyyy"));
+            dobForBackend = dob.format(DateTimeFormatter.ISO_LOCAL_DATE);
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(this, "Invalid Date Format. Please use DD-MM-YYYY.", "Input Error", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+
         StudentUpdateRequest request = StudentUpdateRequest.builder()
                 .name(nameField.getText())
                 .programId(selectedProgram.programId())
                 .yearOfRegistration(yearField.getText())
+                .dateOfBirth(dobForBackend)
                 .build();
 
         SwingWorker<Void, Void> worker = new SwingWorker<>() {

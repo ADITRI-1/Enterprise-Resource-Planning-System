@@ -215,15 +215,15 @@ public class LoginUI extends JFrame {
         switch (result.role().toUpperCase()) {
             case "STUDENT" -> SwingUtilities.invokeLater(() -> {
                 studentClient.setCookieHeader(result.cookieHeader());
-                new StudentDashboardWindow(studentClient).setVisible(true);
+                new StudentDashboardWindow(studentClient, result.maintenanceMode()).setVisible(true);
             });
             case "INSTRUCTOR" -> SwingUtilities.invokeLater(() -> {
                 instructorClient.setCookieHeader(result.cookieHeader());
-                new InstructorDashboardWindow(instructorClient).setVisible(true);
+                new InstructorDashboardWindow(instructorClient, result.maintenanceMode()).setVisible(true);
             });
             case "ADMIN" -> SwingUtilities.invokeLater(() -> {
                 AdminClient admin = new AdminClient(baseUrl, result.cookieHeader());
-                new AdminDashboardExact(admin).setVisible(true);
+                new AdminDashboardExact(admin, result.maintenanceMode()).setVisible(true);
             });
             default -> JOptionPane.showMessageDialog(this,
                     "Unknown role: " + result.role(), "Login", JOptionPane.WARNING_MESSAGE);

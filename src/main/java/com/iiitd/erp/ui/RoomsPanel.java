@@ -7,6 +7,7 @@ import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -17,10 +18,13 @@ public class RoomsPanel extends JPanel {
     private final CardLayout cardLayout = new CardLayout();
     private final JPanel mainPanel = new JPanel(cardLayout);
     private JTable roomsTable;
+    private List<RoomResponse> roomList = new ArrayList<>();
     private static final Logger LOGGER = Logger.getLogger(RoomsPanel.class.getName());
+    private final boolean isMaintenanceMode;
 
-    public RoomsPanel(AdminClient admin) {
+    public RoomsPanel(AdminClient admin, boolean maintenanceMode) {
         this.admin = admin;
+        this.isMaintenanceMode = maintenanceMode;
         setOpaque(false);
         setLayout(new BorderLayout());
         setBorder(new EmptyBorder(10, 20, 10, 20));
@@ -40,19 +44,26 @@ public class RoomsPanel extends JPanel {
         mainPanel.add(createRoomPanel, "create");
 
         cardLayout.show(mainPanel, "list");
-        loadRooms();
+        loadData();
     }
 
     private void showListAndRefresh() {
-        loadRooms();
+        loadData();
         cardLayout.show(mainPanel, "list");
+    }
+    
+    private void showMaintenanceMessage() {
+        JOptionPane.showMessageDialog(this,
+                "Action disabled: The application is currently in maintenance mode.",
+                "Maintenance Mode",
+                JOptionPane.INFORMATION_MESSAGE);
     }
 
     private JPanel createListRoomsPanel() {
         JPanel panel = new JPanel(new BorderLayout(10, 10));
         panel.setOpaque(false);
 
-        roomsTable = new JTable(new DefaultTableModel(new Object[]{"ID", "Number", "Building", "Capacity", "Type"}, 0));
+        roomsTable = new JTable(new DefaultTableModel(new Object[]{"ID", "Building", "Capacity", "Type"}, 0));
         styleTable(roomsTable);
 
         panel.add(new JScrollPane(roomsTable), BorderLayout.CENTER);
@@ -66,15 +77,33 @@ public class RoomsPanel extends JPanel {
 
         JButton addButton = new JButton("Add New Room");
         stylePrimaryButton(addButton);
-        addButton.addActionListener(e -> cardLayout.show(mainPanel, "create"));
+        addButton.addActionListener(e -> {
+            if (isMaintenanceMode) {
+                showMaintenanceMessage();
+                return;
+            }
+            cardLayout.show(mainPanel, "create");
+        });
 
         JButton editButton = new JButton("Edit Selected");
         styleSecondaryButton(editButton);
-        editButton.addActionListener(e -> showUpdateRoomPanel());
+        editButton.addActionListener(e -> {
+            if (isMaintenanceMode) {
+                showMaintenanceMessage();
+                return;
+            }
+            showUpdateRoomPanel();
+        });
 
         JButton deleteButton = new JButton("Delete Selected");
         styleDeleteButton(deleteButton);
-        deleteButton.addActionListener(e -> deleteRoom());
+        deleteButton.addActionListener(e -> {
+            if (isMaintenanceMode) {
+                showMaintenanceMessage();
+                return;
+            }
+            deleteRoom();
+        });
 
         buttonPanel.add(addButton);
         buttonPanel.add(editButton);
@@ -89,7 +118,7 @@ public class RoomsPanel extends JPanel {
         table.getTableHeader().setBackground(new Color(240, 240, 240));
     }
 
-    private void loadRooms() {
+    public void loadData() {
         SwingWorker<List<RoomResponse>, Void> worker = new SwingWorker<>() {
             @Override
             protected List<RoomResponse> doInBackground() {
@@ -105,11 +134,11 @@ public class RoomsPanel extends JPanel {
             @Override
             protected void done() {
                 try {
-                    List<RoomResponse> rows = get();
+                    roomList = get();
                     DefaultTableModel model = (DefaultTableModel) roomsTable.getModel();
                     model.setRowCount(0);
-                    if (rows != null) {
-                        rows.forEach(r -> model.addRow(new Object[]{r.roomId(), r.roomNumber(), r.building(), r.capacity(), r.type()}));
+                    if (roomList != null) {
+                        roomList.forEach(r -> model.addRow(new Object[]{r.roomId(), r.building(), r.capacity(), r.type()}));
                     }
                 } catch (Exception e) {
                     LOGGER.log(Level.SEVERE, "Failed to update room table", e);
@@ -126,14 +155,7 @@ public class RoomsPanel extends JPanel {
             return;
         }
 
-        RoomResponse room = new RoomResponse(
-            (String) roomsTable.getValueAt(row, 0),
-            (String) roomsTable.getValueAt(row, 1),
-            (String) roomsTable.getValueAt(row, 2),
-            (Integer) roomsTable.getValueAt(row, 3),
-            (String) roomsTable.getValueAt(row, 4)
-        );
-
+        RoomResponse room = roomList.get(row);
         JPanel updatePanel = new UpdateRoomPanel(admin, this::showListAndRefresh, room);
         mainPanel.add(updatePanel, "updateRoom");
         cardLayout.show(mainPanel, "updateRoom");
@@ -164,7 +186,7 @@ public class RoomsPanel extends JPanel {
             }
             @Override
             protected void done() {
-                loadRooms();
+                loadData();
             }
         };
         worker.execute();

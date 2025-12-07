@@ -7,6 +7,10 @@ import com.iiitd.erp.ui.client.AdminClient;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
+import java.awt.event.ComponentAdapter;
+import java.awt.event.ComponentEvent;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -40,13 +44,11 @@ public class CreateInstructorPanel extends JPanel {
                 new EmptyBorder(40, 50, 40, 50)
         ));
 
-        // Header
         JLabel title = new JLabel("Create New Instructor", SwingConstants.CENTER);
         title.setFont(new Font("Segoe UI", Font.BOLD, 32));
         title.setForeground(new Color(40, 50, 65));
         formContainer.add(title, BorderLayout.NORTH);
 
-        // Form Panel
         JPanel formPanel = new JPanel(new GridBagLayout());
         formPanel.setOpaque(false);
         GridBagConstraints gbc = new GridBagConstraints();
@@ -62,7 +64,6 @@ public class CreateInstructorPanel extends JPanel {
 
         formContainer.add(formPanel, BorderLayout.CENTER);
 
-        // Buttons
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 15, 10));
         buttonPanel.setOpaque(false);
 
@@ -79,18 +80,29 @@ public class CreateInstructorPanel extends JPanel {
         formContainer.add(buttonPanel, BorderLayout.SOUTH);
 
         GridBagConstraints mainGbc = new GridBagConstraints();
-        mainGbc.gridx = 0;
-        mainGbc.gridy = 0;
-        mainGbc.weightx = 1;
-        mainGbc.weighty = 1;
-        mainGbc.anchor = GridBagConstraints.CENTER;
         add(formContainer, mainGbc);
 
         loadDepartments();
+
+        this.addComponentListener(new ComponentAdapter() {
+            @Override
+            public void componentShown(ComponentEvent e) {
+                resetForm();
+            }
+        });
+    }
+
+    private void resetForm() {
+        codeField.setText("");
+        nameField.setText("");
+        dobField.setText("");
+        emailField.setText("");
+        phoneField.setText("");
+        if (deptIdField.getItemCount() > 0) deptIdField.setSelectedIndex(0);
     }
     
     private void setupDobField(JPanel panel, GridBagConstraints gbc, int y) {
-        JLabel label = new JLabel("Date of Birth:");
+        JLabel label = new JLabel("Date of Birth (DD-MM-YYYY):");
         label.setFont(new Font("Segoe UI", Font.PLAIN, 16));
         gbc.gridx = 0;
         gbc.gridy = y;
@@ -201,19 +213,32 @@ public class CreateInstructorPanel extends JPanel {
     }
 
     private void createInstructor() {
+        if (codeField.getText().trim().isEmpty() || nameField.getText().trim().isEmpty() || dobField.getText().trim().isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Please fill in all required fields.", "Validation Error", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
         DepartmentResponse selectedDept = (DepartmentResponse) deptIdField.getSelectedItem();
         if (selectedDept == null) {
-            JOptionPane.showMessageDialog(this, "Please select a department.", "Selection Required", JOptionPane.WARNING_MESSAGE);
+            JOptionPane.showMessageDialog(this, "Please select a department.", "Validation Error", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+
+        String dobForBackend;
+        try {
+            LocalDate dob = LocalDate.parse(dobField.getText(), DateTimeFormatter.ofPattern("dd-MM-yyyy"));
+            dobForBackend = dob.format(DateTimeFormatter.ISO_LOCAL_DATE);
+        } catch (Exception e) {
+            JOptionPane.showMessageDialog(this, "Invalid Date Format. Please use DD-MM-YYYY.", "Input Error", JOptionPane.ERROR_MESSAGE);
             return;
         }
 
         InstructorCreateRequest request = InstructorCreateRequest.builder()
-                .instructorCode(codeField.getText())
-                .name(nameField.getText())
+                .instructorCode(codeField.getText().trim())
+                .name(nameField.getText().trim())
                 .deptId(selectedDept.deptId())
-                .dateOfBirth(dobField.getText())
-                .email(emailField.getText())
-                .phone(phoneField.getText())
+                .dateOfBirth(dobForBackend)
+                .email(emailField.getText().trim())
+                .phone(phoneField.getText().trim())
                 .build();
 
         SwingWorker<Void, Void> worker = new SwingWorker<>() {

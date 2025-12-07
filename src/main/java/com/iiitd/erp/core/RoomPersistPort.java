@@ -5,7 +5,6 @@ import com.iiitd.erp.Domain.RoomDomain;
 import java.util.List;
 
 public interface RoomPersistPort {
-    RoomDomain findByRoomNumber(String roomNumber);
     RoomDomain findByRoomId(String roomId);
     RoomDomain save(RoomDomain roomDomain);
     RoomDomain update(RoomDomain roomDomain);

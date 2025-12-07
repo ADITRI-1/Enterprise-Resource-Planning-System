@@ -17,4 +17,5 @@ import lombok.extern.jackson.Jacksonized;
 public class LoginRequestDomain {
     private String username;
     private String password;
+    private String role;
 }

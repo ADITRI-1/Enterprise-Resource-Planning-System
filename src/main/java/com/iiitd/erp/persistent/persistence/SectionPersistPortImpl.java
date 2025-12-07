@@ -70,15 +70,31 @@ public class SectionPersistPortImpl implements SectionPersistPort {
     }
 
     @Override
+    public List<SectionDomain> findAll(String semester, Integer year) {
+        LOGGER.debug("Listing all sections (semester={}, year={})", semester, year);
+        try {
+            return sectionRepository.findAllFiltered(semester, year).stream()
+                    .map(ENTITY_TO_DOMAIN_MAPPER_INSTANCE::sectionToSectionDomain)
+                    .collect(Collectors.toList());
+        } catch (Exception ex) {
+            LOGGER.error("Failed to list sections (semester={}, year={})", semester, year, ex);
+            throw ErpException.wrap(ErrorCode.SECTION_LIST_FAILED, ex, Map.of("semester", semester, "year", year));
+        }
+    }
+
+
+    @Override
     public boolean delete(String sectionId) {
-        LOGGER.debug("Deleting section {}", sectionId);
+        LOGGER.debug("Soft-deleting section {}", sectionId);
         Section existing = sectionRepository.findById(sectionId)
                 .orElseThrow(() -> ErpException.of(ErrorCode.SECTION_NOT_FOUND, Map.of("sectionId", sectionId)));
         try {
-            sectionRepository.delete(existing);
+            existing.setIsActive(false);
+            sectionRepository.save(existing);
+            LOGGER.info("Marked section {} as inactive", sectionId);
             return true;
         } catch (Exception ex) {
-            LOGGER.error("Failed to delete section {}", sectionId, ex);
+            LOGGER.error("Failed to mark section {} inactive", sectionId, ex);
             throw ErpException.wrap(ErrorCode.SECTION_DELETE_FAILED, ex, Map.of("sectionId", sectionId));
         }
     }

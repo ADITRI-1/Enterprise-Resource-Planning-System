@@ -19,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 @Service
 @Transactional
@@ -52,19 +53,21 @@ public class InstructorServiceImpl implements InstructorService {
         ensureDepartmentExists(instructorDomain.getDeptId());
 
         try {
+            UUID userId = UUID.randomUUID();
             String username = buildInstructorUsername(instructorDomain);
             String rawPassword = buildInstructorPassword(instructorDomain);
             String passwordHash = passwordEncoder.encode(rawPassword);
 
             userAuthPersistPort.save(UserAuthDomain.builder()
+                    .userId(userId)
                     .username(username)
-                    .role("INSTRUCTOR")
+                    .role("instructor")
                     .passwordHash(passwordHash)
-                    .status("ACTIVE")
+                    .status("active")
                     .active(true)
                     .build());
 
-            instructorPersistPort.save(instructorDomain);
+            instructorPersistPort.save(instructorDomain.withInstructorId(userId));
 
             LOGGER.info("Successfully created instructor {} with username {}", instructorCode, username);
 
@@ -87,9 +90,21 @@ public class InstructorServiceImpl implements InstructorService {
         String code = instructorDomain.getInstructorCode();
         LOGGER.info("Updating instructor {}", code);
 
-        if (instructorPersistPort.findByInstructorCode(code) == null) {
+        InstructorDomain existing = instructorPersistPort.findByInstructorCode(code);
+        if (existing == null) {
             throw ErpException.of(ErrorCode.INSTRUCTOR_NOT_FOUND, Map.of("instructorCode", code));
         }
+
+        InstructorDomain merged = existing
+                .withName(keep(instructorDomain.getName(), existing.getName()))
+                .withDateOfBirth(keep(instructorDomain.getDateOfBirth(), existing.getDateOfBirth()))
+                .withDeptId(keep(instructorDomain.getDeptId(), existing.getDeptId()))
+                .withEmail(keep(instructorDomain.getEmail(), existing.getEmail()))
+                .withPhone(keep(instructorDomain.getPhone(), existing.getPhone()))
+                .withInstructorCode(existing.getInstructorCode())
+                .withInstructorId(existing.getInstructorId());
+
+
 
         ensureDepartmentExists(instructorDomain.getDeptId());
 
@@ -110,12 +125,16 @@ public class InstructorServiceImpl implements InstructorService {
     public boolean deleteInstructor(String instructorCode) {
         LOGGER.info("Deleting instructor {}", instructorCode);
 
-        if (instructorPersistPort.findByInstructorCode(instructorCode) == null) {
+        InstructorDomain existing = instructorPersistPort.findByInstructorCode(instructorCode);
+        if (existing == null) {
             throw ErpException.of(ErrorCode.INSTRUCTOR_NOT_FOUND, Map.of("instructorCode", instructorCode));
         }
 
         try {
             boolean deleted = instructorPersistPort.deleteByInstructorCode(instructorCode);
+            if (existing.getInstructorId() != null) {
+                userAuthPersistPort.deleteByUserId(existing.getInstructorId());
+            }
             LOGGER.info("Deleted instructor {}: {}", instructorCode, deleted);
             return deleted;
         } catch (ErpException ex) {
@@ -152,7 +171,7 @@ public class InstructorServiceImpl implements InstructorService {
 
     private String buildInstructorUsername(InstructorDomain instructorDomain) {
         String firstName = instructorDomain.getName().split(" ")[0].toLowerCase();
-        return firstName + "_" + instructorDomain.getInstructorCode();
+        return firstName + "_" + instructorDomain.getInstructorCode().toLowerCase();
     }
 
     private String buildInstructorPassword(InstructorDomain instructorDomain) {
@@ -162,4 +181,6 @@ public class InstructorServiceImpl implements InstructorService {
         String lastThree = code.substring(Math.max(0, code.length() - 3));
         return monthDay + lastThree;
     }
+
+    private <T> T keep(T incoming, T existing) { return incoming != null ? incoming : existing; }
 }

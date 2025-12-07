@@ -15,9 +15,11 @@ public class RegisterCoursesWindow extends JFrame {
     private final StudentClient client;
     private JTable courseTable;
     private final static Logger LOGGER = Logger.getLogger(RegisterCoursesWindow.class.getName());
+    private final boolean isMaintenanceMode;
 
-    public RegisterCoursesWindow(StudentClient client) {
+    public RegisterCoursesWindow(StudentClient client, boolean maintenanceMode) {
         this.client = client;
+        this.isMaintenanceMode = maintenanceMode;
         LOGGER.info("RegisterCoursesWindow initialized");
 
         setTitle("Register for Courses");
@@ -31,6 +33,7 @@ public class RegisterCoursesWindow extends JFrame {
 
         JButton registerButton = new JButton("Register");
         registerButton.addActionListener(e -> registerForCourse());
+        registerButton.setEnabled(!isMaintenanceMode);
         JPanel bottomPanel = new JPanel();
         bottomPanel.add(registerButton);
         add(bottomPanel, BorderLayout.SOUTH);

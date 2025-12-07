@@ -38,18 +38,26 @@ public class AuthSessionServiceImpl implements AuthSessionService {
 
     @Override
     @Transactional
-    public AuthResultDomain loginAndCreateSession(String username, String password, HttpServletRequest req) {
-        LOGGER.info("Login attempt for {}", username);
+    public AuthResultDomain loginAndCreateSession(String username, String password, String role, HttpServletRequest req) {
+        LOGGER.info("Login attempt for {} with role {}", username,role);
         try {
             Authentication auth = authManager.authenticate(
                     new UsernamePasswordAuthenticationToken(username, password)
             );
             SecurityContextHolder.getContext().setAuthentication(auth);
 
-            HttpSession session = req.getSession(true);
             UserAuthDomain user = findUser(username);
-            session.setAttribute("uid", user.getUserId());
-            session.setAttribute("role", user.getRole());
+
+            if(role!=null && !role.isBlank() && !role.equalsIgnoreCase(user.getRole())){
+                LOGGER.warn("Role mismatch for {} (requested {}, actual {})",username,role,user.getRole());
+                SecurityContextHolder.clearContext();
+                throw ErpException.of(ErrorCode.AUTHENTICATION_FAILED,
+                        Map.of("username",username,"role",role,"expectedRole",user.getRole()));
+            }
+
+            HttpSession session =req.getSession(true);
+            session.setAttribute("uid",user.getUserId());
+            session.setAttribute("role",user.getRole());
 
             OffsetDateTime previousLogin = user.getLastLogin();
             boolean firstLogin = (previousLogin == null);

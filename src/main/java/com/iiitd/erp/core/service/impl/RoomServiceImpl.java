@@ -27,23 +27,23 @@ public class RoomServiceImpl implements RoomService {
 
     @Override
     public RoomDomain createRoom(RoomDomain roomDomain) {
-        String roomNumber = roomDomain.getRoomNumber();
-        LOGGER.info("Creating room {}", roomNumber);
+        String roomId = roomDomain.getRoomId();
+        LOGGER.info("Creating room {}", roomId);
 
-        if (roomPersistPort.findByRoomNumber(roomNumber) != null) {
-            throw ErpException.of(ErrorCode.ROOM_DUPLICATE, Map.of("roomNumber", roomNumber));
+        if (roomPersistPort.findByRoomId(roomId) != null) {
+            throw ErpException.of(ErrorCode.ROOM_DUPLICATE, Map.of("roomId", roomId));
         }
 
         try {
             RoomDomain saved = roomPersistPort.save(roomDomain);
-            LOGGER.info("Created room {}", roomNumber);
+            LOGGER.info("Created room {}", roomId);
             return saved;
         } catch (ErpException ex) {
-            LOGGER.error("Business error while creating room {}: {}", roomNumber, ex.getErrorCode().getCode(), ex);
+            LOGGER.error("Business error while creating room {}: {}", roomId, ex.getErrorCode().getCode(), ex);
             throw ex;
         } catch (Exception ex) {
-            LOGGER.error("Unexpected error while creating room {}", roomNumber, ex);
-            throw ErpException.wrap(ErrorCode.ROOM_CREATE_FAILED, ex, Map.of("roomNumber", roomNumber));
+            LOGGER.error("Unexpected error while creating room {}", roomId, ex);
+            throw ErpException.wrap(ErrorCode.ROOM_CREATE_FAILED, ex, Map.of("roomId", roomId));
         }
     }
 

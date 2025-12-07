@@ -8,6 +8,7 @@ import com.iiitd.erp.exception.ErpException;
 import com.iiitd.erp.io.dto.request.LoginRequest;
 import com.iiitd.erp.io.dto.response.LoginResponse;
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
@@ -32,12 +33,12 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody LoginRequest body, HttpServletRequest request){
+    public ResponseEntity<?> login(@RequestBody @Valid LoginRequest body, HttpServletRequest request){
         LoginRequestDomain loginRequest = REQUEST_TO_DOMAIN_MAPPER_INSTANCE.loginRequestToDomain(body);
         String username = loginRequest.getUsername();
         LOGGER.info("Login attempt for {}", username);
         try {
-            AuthResultDomain result = authSessionService.loginAndCreateSession(username, loginRequest.getPassword(), request);
+            AuthResultDomain result = authSessionService.loginAndCreateSession(username, loginRequest.getPassword(), loginRequest.getRole(), request);
             LoginResponse response = DOMAIN_TO_RESPONSE_MAPPER_INSTANCE.domainToLoginResponse(result).withMessage("Login Successful");
             return ResponseEntity.ok(response);
         } catch (ErpException ex) {

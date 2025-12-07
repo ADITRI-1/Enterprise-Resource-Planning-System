@@ -111,7 +111,7 @@ public class SectionScheduleServiceImpl implements SectionScheduleService {
             normalized.add(slot
                     .withSectionId(section.getSectionId())
                     .withScheduleId(slot.getScheduleId())
-                    .withRoomNumber(room.getRoomNumber())
+                    .withRoomNumber(room.getRoomId())
                     .withRoomCapacity(room.getCapacity()));
         }
         ensureNoInternalClashes(normalized);
@@ -148,7 +148,7 @@ public class SectionScheduleServiceImpl implements SectionScheduleService {
                     if (room == null) {
                         return slot;
                     }
-                    return slot.withRoomNumber(room.getRoomNumber())
+                    return slot.withRoomNumber(room.getRoomId())
                             .withRoomCapacity(room.getCapacity());
                 })
                 .collect(Collectors.toList());

@@ -6,6 +6,8 @@ import com.iiitd.erp.ui.client.AdminClient;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
+import java.awt.event.ComponentAdapter;
+import java.awt.event.ComponentEvent;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -36,13 +38,11 @@ public class CreateProgramPanel extends JPanel {
                 new EmptyBorder(40, 50, 40, 50)
         ));
 
-        // Header
         JLabel title = new JLabel("Create New Program", SwingConstants.CENTER);
         title.setFont(new Font("Segoe UI", Font.BOLD, 32));
         title.setForeground(new Color(40, 50, 65));
         formContainer.add(title, BorderLayout.NORTH);
 
-        // Form Panel
         JPanel formPanel = new JPanel(new GridBagLayout());
         formPanel.setOpaque(false);
         GridBagConstraints gbc = new GridBagConstraints();
@@ -56,7 +56,6 @@ public class CreateProgramPanel extends JPanel {
 
         formContainer.add(formPanel, BorderLayout.CENTER);
 
-        // Buttons
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 15, 10));
         buttonPanel.setOpaque(false);
 
@@ -73,12 +72,21 @@ public class CreateProgramPanel extends JPanel {
         formContainer.add(buttonPanel, BorderLayout.SOUTH);
 
         GridBagConstraints mainGbc = new GridBagConstraints();
-        mainGbc.gridx = 0;
-        mainGbc.gridy = 0;
-        mainGbc.weightx = 1;
-        mainGbc.weighty = 1;
-        mainGbc.anchor = GridBagConstraints.CENTER;
         add(formContainer, mainGbc);
+
+        this.addComponentListener(new ComponentAdapter() {
+            @Override
+            public void componentShown(ComponentEvent e) {
+                resetForm();
+            }
+        });
+    }
+
+    private void resetForm() {
+        txtId.setText("");
+        txtDesc.setText("");
+        if (cbType.getItemCount() > 0) cbType.setSelectedIndex(0);
+        if (cbDuration.getItemCount() > 0) cbDuration.setSelectedIndex(0);
     }
 
     private void addField(JPanel panel, GridBagConstraints gbc, int y, String labelText, JComponent component) {
@@ -131,6 +139,11 @@ public class CreateProgramPanel extends JPanel {
     }
 
     private void createProgram() {
+        if (txtId.getText().trim().isEmpty() || txtDesc.getText().trim().isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Please fill in all required fields.", "Validation Error", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+
         ProgramCreateRequest request = ProgramCreateRequest.builder()
                 .programId(txtId.getText().trim())
                 .programDesc(txtDesc.getText().trim())

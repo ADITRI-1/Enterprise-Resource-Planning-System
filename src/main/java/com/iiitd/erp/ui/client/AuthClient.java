@@ -51,9 +51,9 @@ public class AuthClient {
 
         if (status >= 200 && status < 300) {
             LoginResponse resp = mapper.readValue(body, LoginResponse.class);
-            return new LoginResult(true, resp.message, resp.username, resp.role, resp.sessionId, cookieHeader);
+            return new LoginResult(true, resp.message, resp.username, resp.role, resp.sessionId, cookieHeader, resp.maintenanceMode);
         } else {
-            return new LoginResult(false, extractMessage(body), null, null, null, cookieHeader);
+            return new LoginResult(false, extractMessage(body), null, null, null, cookieHeader, false);
         }
     }
 
@@ -68,9 +68,9 @@ public class AuthClient {
 
     // DTOs for deserialization
     private record LoginRequest(String username, String password, String role) {}
-    private record LoginResponse(String message, String username, String role, String sessionId) {}
+    private record LoginResponse(String message, String username, String role, String sessionId, boolean maintenanceMode) {}
     private record ApiError(String errorCode, String message) {}
 
 
-    public record LoginResult(boolean success, String message, String username, String role, String sessionId, String cookieHeader) {}
+    public record LoginResult(boolean success, String message, String username, String role, String sessionId, String cookieHeader, boolean maintenanceMode) {}
 }

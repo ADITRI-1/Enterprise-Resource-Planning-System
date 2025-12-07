@@ -22,7 +22,7 @@ public interface EntityToDomainMapper {
     @Mapping(target = "deptId", source = "departmentId")
     InstructorDomain instructorToInstructorDomain(Instructor instructor);
 
-    @Mapping(target = "programType", source = "program_type")
+    @Mapping(target = "programType", source = "programType")
     ProgramDomain programToProgramDomain(Program program);
 
     DepartmentDomain departmentToDepartmentDomain(Department department);

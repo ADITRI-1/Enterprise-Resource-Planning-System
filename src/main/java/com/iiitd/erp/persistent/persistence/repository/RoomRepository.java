@@ -7,7 +7,7 @@ import java.util.List;
 import java.util.Optional;
 
 public interface RoomRepository extends JpaRepository<Room, String> {
-    Optional<Room> findByRoomNumber(String roomNumber);
+    Optional<Room> findByRoomId(String roomId);
     List<Room> findByCapacityGreaterThanEqual(int capacity);
 
 }

@@ -7,6 +7,7 @@ import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -17,10 +18,13 @@ public class DepartmentsPanel extends JPanel {
     private final CardLayout cardLayout = new CardLayout();
     private final JPanel mainPanel = new JPanel(cardLayout);
     private JTable departmentsTable;
+    private List<DepartmentResponse> departmentList = new ArrayList<>();
     private static final Logger LOGGER = Logger.getLogger(DepartmentsPanel.class.getName());
+    private final boolean isMaintenanceMode;
 
-    public DepartmentsPanel(AdminClient admin) {
+    public DepartmentsPanel(AdminClient admin, boolean maintenanceMode) {
         this.admin = admin;
+        this.isMaintenanceMode = maintenanceMode;
         setOpaque(false);
         setLayout(new BorderLayout());
         setBorder(new EmptyBorder(10, 20, 10, 20));
@@ -40,12 +44,19 @@ public class DepartmentsPanel extends JPanel {
         mainPanel.add(createDepartmentPanel, "create");
 
         cardLayout.show(mainPanel, "list");
-        loadDepartments();
+        loadData();
     }
 
     private void showListAndRefresh() {
-        loadDepartments();
+        loadData();
         cardLayout.show(mainPanel, "list");
+    }
+    
+    private void showMaintenanceMessage() {
+        JOptionPane.showMessageDialog(this,
+                "Action disabled: The application is currently in maintenance mode.",
+                "Maintenance Mode",
+                JOptionPane.INFORMATION_MESSAGE);
     }
 
     private JPanel createListDepartmentsPanel() {
@@ -66,15 +77,33 @@ public class DepartmentsPanel extends JPanel {
 
         JButton addButton = new JButton("Add New Department");
         stylePrimaryButton(addButton);
-        addButton.addActionListener(e -> cardLayout.show(mainPanel, "create"));
+        addButton.addActionListener(e -> {
+            if (isMaintenanceMode) {
+                showMaintenanceMessage();
+                return;
+            }
+            cardLayout.show(mainPanel, "create");
+        });
 
         JButton editButton = new JButton("Edit Selected");
         styleSecondaryButton(editButton);
-        editButton.addActionListener(e -> showUpdateDepartmentPanel());
+        editButton.addActionListener(e -> {
+            if (isMaintenanceMode) {
+                showMaintenanceMessage();
+                return;
+            }
+            showUpdateDepartmentPanel();
+        });
 
         JButton deleteButton = new JButton("Delete Selected");
         styleDeleteButton(deleteButton);
-        deleteButton.addActionListener(e -> deleteDepartment());
+        deleteButton.addActionListener(e -> {
+            if (isMaintenanceMode) {
+                showMaintenanceMessage();
+                return;
+            }
+            deleteDepartment();
+        });
 
         buttonPanel.add(addButton);
         buttonPanel.add(editButton);
@@ -89,7 +118,7 @@ public class DepartmentsPanel extends JPanel {
         table.getTableHeader().setBackground(new Color(240, 240, 240));
     }
 
-    private void loadDepartments() {
+    public void loadData() {
         SwingWorker<List<DepartmentResponse>, Void> worker = new SwingWorker<>() {
             @Override
             protected List<DepartmentResponse> doInBackground() {
@@ -105,11 +134,11 @@ public class DepartmentsPanel extends JPanel {
             @Override
             protected void done() {
                 try {
-                    List<DepartmentResponse> rows = get();
+                    departmentList = get();
                     DefaultTableModel model = (DefaultTableModel) departmentsTable.getModel();
                     model.setRowCount(0);
-                    if (rows != null) {
-                        rows.forEach(d -> model.addRow(new Object[]{d.deptId(), d.deptDesc()}));
+                    if (departmentList != null) {
+                        departmentList.forEach(d -> model.addRow(new Object[]{d.deptId(), d.deptDesc()}));
                     }
                 } catch (Exception e) {
                     LOGGER.log(Level.SEVERE, "Failed to update department table", e);
@@ -126,11 +155,7 @@ public class DepartmentsPanel extends JPanel {
             return;
         }
 
-        DepartmentResponse department = new DepartmentResponse(
-            (String) departmentsTable.getValueAt(row, 0),
-            (String) departmentsTable.getValueAt(row, 1)
-        );
-
+        DepartmentResponse department = departmentList.get(row);
         JPanel updatePanel = new UpdateDepartmentPanel(admin, this::showListAndRefresh, department);
         mainPanel.add(updatePanel, "updateDepartment");
         cardLayout.show(mainPanel, "updateDepartment");
@@ -161,7 +186,7 @@ public class DepartmentsPanel extends JPanel {
             }
             @Override
             protected void done() {
-                loadDepartments();
+                loadData();
             }
         };
         worker.execute();

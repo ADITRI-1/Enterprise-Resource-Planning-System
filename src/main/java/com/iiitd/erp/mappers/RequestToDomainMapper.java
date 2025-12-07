@@ -3,6 +3,7 @@ package com.iiitd.erp.mappers;
 import com.iiitd.erp.Domain.*;
 import com.iiitd.erp.io.dto.request.*;
 import org.mapstruct.Mapper;
+import org.mapstruct.Mapping;
 import org.mapstruct.factory.Mappers;
 
 @Mapper
@@ -39,6 +40,7 @@ public interface RequestToDomainMapper {
 
     SectionDomain sectionUpdateRequestToDomain(SectionUpdateRequest request);
 
+    @Mapping(source= "day", target = "dayOfWeek")
     ClassScheduleDomain scheduleSlotRequestToDomain(ScheduleSlotRequest request);
 
     AssessmentComponentDomain assessmentComponentRequestToDomain(AssessmentComponentRequest request);

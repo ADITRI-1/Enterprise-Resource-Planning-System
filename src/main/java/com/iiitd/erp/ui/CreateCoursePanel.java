@@ -7,6 +7,8 @@ import com.iiitd.erp.ui.client.AdminClient;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
+import java.awt.event.ComponentAdapter;
+import java.awt.event.ComponentEvent;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -38,13 +40,11 @@ public class CreateCoursePanel extends JPanel {
                 new EmptyBorder(40, 50, 40, 50)
         ));
 
-        // Header
         JLabel title = new JLabel("Create New Course", SwingConstants.CENTER);
         title.setFont(new Font("Segoe UI", Font.BOLD, 32));
         title.setForeground(new Color(40, 50, 65));
         formContainer.add(title, BorderLayout.NORTH);
 
-        // Form Panel
         JPanel formPanel = new JPanel(new GridBagLayout());
         formPanel.setOpaque(false);
         GridBagConstraints gbc = new GridBagConstraints();
@@ -58,7 +58,6 @@ public class CreateCoursePanel extends JPanel {
 
         formContainer.add(formPanel, BorderLayout.CENTER);
 
-        // Buttons
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER, 15, 10));
         buttonPanel.setOpaque(false);
 
@@ -75,14 +74,23 @@ public class CreateCoursePanel extends JPanel {
         formContainer.add(buttonPanel, BorderLayout.SOUTH);
 
         GridBagConstraints mainGbc = new GridBagConstraints();
-        mainGbc.gridx = 0;
-        mainGbc.gridy = 0;
-        mainGbc.weightx = 1;
-        mainGbc.weighty = 1;
-        mainGbc.anchor = GridBagConstraints.CENTER;
         add(formContainer, mainGbc);
 
         loadDepartments();
+
+        this.addComponentListener(new ComponentAdapter() {
+            @Override
+            public void componentShown(ComponentEvent e) {
+                resetForm();
+            }
+        });
+    }
+
+    private void resetForm() {
+        txtCode.setText("");
+        txtTitle.setText("");
+        if (cbDept.getItemCount() > 0) cbDept.setSelectedIndex(0);
+        if (cbCredits.getItemCount() > 0) cbCredits.setSelectedIndex(0);
     }
 
     private void loadDepartments() {
@@ -164,9 +172,13 @@ public class CreateCoursePanel extends JPanel {
     }
 
     private void createCourse() {
+        if (txtCode.getText().trim().isEmpty() || txtTitle.getText().trim().isEmpty()) {
+            JOptionPane.showMessageDialog(this, "Please fill in all required fields.", "Validation Error", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
         DepartmentResponse selectedDept = (DepartmentResponse) cbDept.getSelectedItem();
         if (selectedDept == null) {
-            JOptionPane.showMessageDialog(this, "Please select a department.", "Selection Required", JOptionPane.WARNING_MESSAGE);
+            JOptionPane.showMessageDialog(this, "Please select a department.", "Validation Error", JOptionPane.ERROR_MESSAGE);
             return;
         }
 

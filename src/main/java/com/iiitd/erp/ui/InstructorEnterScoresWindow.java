@@ -10,19 +10,10 @@ import java.awt.event.*;
 import java.util.HashMap;
 import java.util.Map;
 
-/**
- * EnterScoresWindow
- * Updated as per latest requirements:
- *  - Course combo on top (beside title).
- *  - One table per course (shown via CardLayout).
- *  - Component & Max Marks chosen once from dropdowns in a filter bar;
- *    all rows update automatically for that course.
- *  - Only "Marks" cells are editable.
- */
 public class InstructorEnterScoresWindow extends JFrame {
 
     private final InstructorClient client;
-    // ---- top-level combos and cards ----
+    private final boolean isMaintenanceMode;
     private JComboBox<String> courseCombo;
     private JComboBox<String> componentCombo;
     private JComboBox<Integer> maxCombo;
@@ -33,26 +24,24 @@ public class InstructorEnterScoresWindow extends JFrame {
             "MTH207 - Linear Algebra"
     };
 
-    // mapping component -> possible max marks
     private final Map<String, Integer[]> componentMaxMap = new HashMap<>();
-
     private final CardLayout cardLayout = new CardLayout();
     private final JPanel tableCards = new JPanel(cardLayout);
     private final Map<String, ScoresTableModel> courseModels = new HashMap<>();
 
     public static void main(String[] args) {
-        SwingUtilities.invokeLater(() -> new InstructorEnterScoresWindow(null).setVisible(true));
+        SwingUtilities.invokeLater(() -> new InstructorEnterScoresWindow(null, false).setVisible(true));
     }
 
-    public InstructorEnterScoresWindow(InstructorClient client) {
+    public InstructorEnterScoresWindow(InstructorClient client, boolean maintenanceMode) {
         this.client = client;
+        this.isMaintenanceMode = maintenanceMode;
         setTitle("Enter Scores");
         setSize(1250, 760);
         setLocationRelativeTo(null);
         setDefaultCloseOperation(JFrame.DISPOSE_ON_CLOSE);
         setLayout(new BorderLayout());
 
-        // component -> max marks mapping
         componentMaxMap.put("Quiz",        new Integer[]{10, 20});
         componentMaxMap.put("Assignment",  new Integer[]{20, 25});
         componentMaxMap.put("Project",     new Integer[]{30});
@@ -70,14 +59,10 @@ public class InstructorEnterScoresWindow extends JFrame {
         main.add(buildContent(), BorderLayout.CENTER);
     }
 
-    /* ============================================================
-       CENTER CONTENT
-       ============================================================ */
     private JComponent buildContent() {
         JPanel root = new JPanel(new BorderLayout());
         root.setOpaque(false);
 
-        // ---- title + course dropdown row ----
         JPanel titleRow = new JPanel(new BorderLayout());
         titleRow.setOpaque(false);
         titleRow.setBorder(new EmptyBorder(18, 24, 6, 24));
@@ -99,7 +84,6 @@ public class InstructorEnterScoresWindow extends JFrame {
 
         root.add(titleRow, BorderLayout.NORTH);
 
-        // ---- filter bar: Component + Max Marks ----
         JPanel filterBar = new JPanel(new FlowLayout(FlowLayout.LEFT, 16, 4));
         filterBar.setOpaque(false);
         filterBar.setBorder(new EmptyBorder(4, 24, 4, 24));
@@ -120,13 +104,11 @@ public class InstructorEnterScoresWindow extends JFrame {
         filterBar.add(maxLbl);
         filterBar.add(maxCombo);
 
-        // ---- tables area (one per course) ----
         tableCards.setOpaque(false);
         tableCards.setBorder(new EmptyBorder(4, 24, 24, 24));
 
-        // create tables & models for each course
         for (String c : courses) {
-            ScoresTableModel model = new ScoresTableModel(studentsForCourse(c));
+            ScoresTableModel model = new ScoresTableModel(studentsForCourse(c), isMaintenanceMode);
             JTable table = new JTable(model);
             table.setRowHeight(30);
             table.setFont(new Font("Segoe UI", Font.PLAIN, 18));
@@ -134,7 +116,6 @@ public class InstructorEnterScoresWindow extends JFrame {
             table.getTableHeader().setReorderingAllowed(false);
             table.setFillsViewportHeight(true);
 
-            // only last column editable ("Marks") – model already enforces this
             JScrollPane sp = new JScrollPane(table);
             sp.getViewport().setBackground(Color.WHITE);
 
@@ -142,7 +123,6 @@ public class InstructorEnterScoresWindow extends JFrame {
             courseModels.put(c, model);
         }
 
-        // initial component + max selections
         updateMaxMarksCombo();
         componentCombo.addActionListener(e -> {
             updateMaxMarksCombo();
@@ -150,7 +130,6 @@ public class InstructorEnterScoresWindow extends JFrame {
         });
         maxCombo.addActionListener(e -> applyComponentAndMaxToCurrentModel());
 
-        // course switching
         courseCombo.addActionListener(e -> {
             String sel = (String) courseCombo.getSelectedItem();
             if (sel != null) {
@@ -159,7 +138,6 @@ public class InstructorEnterScoresWindow extends JFrame {
             }
         });
 
-        // show first card by default
         if (courses.length > 0) cardLayout.show(tableCards, courses[0]);
 
         JPanel center = new JPanel(new BorderLayout());
@@ -171,7 +149,6 @@ public class InstructorEnterScoresWindow extends JFrame {
         return root;
     }
 
-    /** Update max marks combo whenever component changes. */
     private void updateMaxMarksCombo() {
         String comp = (String) componentCombo.getSelectedItem();
         maxCombo.removeAllItems();
@@ -184,7 +161,6 @@ public class InstructorEnterScoresWindow extends JFrame {
         if (maxCombo.getItemCount() > 0) maxCombo.setSelectedIndex(0);
     }
 
-    /** Apply currently selected component & max to the visible table model. */
     private void applyComponentAndMaxToCurrentModel() {
         String course = (String) courseCombo.getSelectedItem();
         String comp   = (String) componentCombo.getSelectedItem();
@@ -196,9 +172,7 @@ public class InstructorEnterScoresWindow extends JFrame {
         }
     }
 
-    /** Mock data: (Student ID, Student Name) for each course. */
     private Object[][] studentsForCourse(String course) {
-        // You can replace this with real data later.
         if (course.startsWith("CSE231")) {
             return new Object[][] {
                     {"2024CS20101", "Rahul Sharma"},
@@ -222,23 +196,22 @@ public class InstructorEnterScoresWindow extends JFrame {
         }
     }
 
-    /* ============================================================
-       TABLE MODEL
-       ============================================================ */
     static class ScoresTableModel extends AbstractTableModel {
         private final String[] cols = {
                 "Student ID", "Student Name", "Component", "Max Marks", "Marks"
         };
-        private final Object[][] data; // each row: [id, name, component, max, marks]
+        private final Object[][] data;
+        private final boolean isMaintenanceMode;
 
-        ScoresTableModel(Object[][] students) {
+        ScoresTableModel(Object[][] students, boolean maintenanceMode) {
+            this.isMaintenanceMode = maintenanceMode;
             data = new Object[students.length][5];
             for (int i = 0; i < students.length; i++) {
                 data[i][0] = students[i][0];
                 data[i][1] = students[i][1];
-                data[i][2] = "";   // component
-                data[i][3] = "";   // max marks
-                data[i][4] = "";   // marks (editable)
+                data[i][2] = "";
+                data[i][3] = "";
+                data[i][4] = "";
             }
         }
 
@@ -259,11 +232,9 @@ public class InstructorEnterScoresWindow extends JFrame {
 
         @Override
         public boolean isCellEditable(int rowIndex, int columnIndex) {
-            // Only "Marks" column editable (index 4)
-            return columnIndex == 4;
+            return columnIndex == 4 && !isMaintenanceMode;
         }
 
-        /** Apply component & max marks to entire column for this model. */
         public void setComponentAndMax(String component, int maxMarks) {
             for (int r = 0; r < data.length; r++) {
                 data[r][2] = component;
@@ -275,9 +246,6 @@ public class InstructorEnterScoresWindow extends JFrame {
         }
     }
 
-    /* ============================================================
-       HEADER BAR WITH IIITD LOGO
-       ============================================================ */
     static class HeaderBar extends JPanel {
         HeaderBar() { setPreferredSize(new Dimension(0, 92)); }
 
@@ -293,7 +261,6 @@ public class InstructorEnterScoresWindow extends JFrame {
             int cy = getHeight() / 2;
             int left = 26;
 
-            // white bars
             g2.setColor(Color.WHITE);
             int barW = 10, barH = 44, gap = 10, x = left, barY = cy - barH / 2;
             for (int i = 0; i < 4; i++) {
@@ -301,7 +268,6 @@ public class InstructorEnterScoresWindow extends JFrame {
                 x += barW + gap;
             }
 
-            // teal arc (D)
             g2.setColor(new Color(85, 172, 168));
             g2.setStroke(new BasicStroke(8f, BasicStroke.CAP_ROUND, BasicStroke.JOIN_ROUND));
             g2.drawArc(x - 18, cy - 21, 42, 42, -90, 180);
@@ -319,9 +285,6 @@ public class InstructorEnterScoresWindow extends JFrame {
         }
     }
 
-    /* ============================================================
-       SLIDING LEFT PANEL (GENERIC)
-       ============================================================ */
     static class SlidingPanel extends JPanel {
         private final JPanel content;
         private final ArrowIndicator arrow;
@@ -419,9 +382,6 @@ public class InstructorEnterScoresWindow extends JFrame {
         }
     }
 
-    /* ============================================================
-       LEFT RAIL (simple, no external dependencies)
-       ============================================================ */
     static class LeftRail extends JPanel {
         private final InstructorClient client;
         LeftRail(InstructorClient client) {
@@ -433,7 +393,7 @@ public class InstructorEnterScoresWindow extends JFrame {
             add(Box.createVerticalStrut(10));
             add(pad(navButton("Course Sections", e -> new InstructorCourseSectionsWindow(client).setVisible(true)), 0, 16, 0, 16));
             add(Box.createVerticalStrut(10));
-            add(pad(navButton("Enter Scores", e -> new InstructorEnterScoresWindow(client).setVisible(true)), 0, 16, 0, 16));
+            add(pad(navButton("Enter Scores", e -> new InstructorEnterScoresWindow(client, false).setVisible(true)), 0, 16, 0, 16));
             add(Box.createVerticalGlue());
         }
 
@@ -450,7 +410,6 @@ public class InstructorEnterScoresWindow extends JFrame {
             card.setLayout(new BoxLayout(card, BoxLayout.Y_AXIS));
             card.setBorder(new EmptyBorder(16, 0, 16, 0));
 
-            // simple circular "I" avatar for Instructor
             JComponent avatar = new JComponent() {
                 @Override protected void paintComponent(Graphics g) {
                     Graphics2D g2 = (Graphics2D) g;
@@ -506,9 +465,6 @@ public class InstructorEnterScoresWindow extends JFrame {
         }
     }
 
-    /* ============================================================
-       FOOTER
-       ============================================================ */
     static class FooterBar extends JPanel {
         FooterBar() { setPreferredSize(new Dimension(0, 56)); }
 

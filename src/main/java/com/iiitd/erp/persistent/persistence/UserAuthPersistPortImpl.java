@@ -14,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.OffsetDateTime;
 import java.util.Collections;
 import java.util.Optional;
+import java.util.UUID;
 
 import static com.iiitd.erp.mappers.DomainToEntityMapper.DOMAIN_TO_ENTITY_MAPPER_INSTANCE;
 import static com.iiitd.erp.mappers.EntityToDomainMapper.ENTITY_TO_DOMAIN_MAPPER_INSTANCE;
@@ -74,6 +75,18 @@ public class UserAuthPersistPortImpl implements UserAuthPersistPort {
                     ErrorCode.USERAUTH_LAST_LOGIN_UPDATE_FAILED,
                     ex,
                     Collections.singletonMap("username", username));
+        }
+    }
+
+    @Override
+    public void deleteByUserId(UUID userId) {
+        LOGGER.debug("Deleting auth record {}", userId);
+        try {
+            userAuthRepository.deleteById(userId);
+            LOGGER.info("Deleted auth record {}", userId);
+        } catch (Exception ex) {
+            LOGGER.error("Failed to delete auth record {}", userId, ex);
+            throw ex; // service layer will wrap into its own error code
         }
     }
 }
