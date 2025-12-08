@@ -43,5 +43,7 @@ public interface DomainToResponseMapper {
 
     TimetableSlot studentTimeTableSlotToResponse(StudentTimeTableSlotDomain domain);
 
+    TimetableSearchSlotResponse timetableSearchSlotDomainToResponse(TimetableSearchSlotDomain domain);
+
     GradeRow studentGradeDomainToResponse(StudentGradeDomain domain);
 }

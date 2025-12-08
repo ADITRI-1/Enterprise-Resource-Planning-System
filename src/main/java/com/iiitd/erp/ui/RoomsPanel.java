@@ -5,7 +5,10 @@ import com.iiitd.erp.ui.client.AdminClient;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
 import javax.swing.table.DefaultTableModel;
+import javax.swing.table.TableRowSorter;
 import java.awt.*;
 import java.util.ArrayList;
 import java.util.List;
@@ -18,6 +21,7 @@ public class RoomsPanel extends JPanel {
     private final CardLayout cardLayout = new CardLayout();
     private final JPanel mainPanel = new JPanel(cardLayout);
     private JTable roomsTable;
+    private TableRowSorter<DefaultTableModel> sorter;
     private List<RoomResponse> roomList = new ArrayList<>();
     private static final Logger LOGGER = Logger.getLogger(RoomsPanel.class.getName());
     private final boolean isMaintenanceMode;
@@ -26,44 +30,73 @@ public class RoomsPanel extends JPanel {
         this.admin = admin;
         this.isMaintenanceMode = maintenanceMode;
         setOpaque(false);
-        setLayout(new BorderLayout());
+        setLayout(new BorderLayout(0, 15));
         setBorder(new EmptyBorder(10, 20, 10, 20));
 
         JLabel title = new JLabel("Room Management");
         title.setFont(new Font("Segoe UI", Font.BOLD, 32));
         title.setForeground(new Color(40, 50, 65));
-        title.setBorder(new EmptyBorder(10, 0, 20, 0));
+        title.setBorder(new EmptyBorder(10, 0, 10, 0));
         add(title, BorderLayout.NORTH);
 
-        add(mainPanel, BorderLayout.CENTER);
+        JPanel contentPanel = new JPanel(new BorderLayout(0, 10));
+        contentPanel.setOpaque(false);
+        
+        contentPanel.add(createFilterBar(), BorderLayout.NORTH);
+        
+        mainPanel.add(createListRoomsPanel(), "list");
+        mainPanel.add(new CreateRoomPanel(admin, this::showListAndRefresh), "create");
+        contentPanel.add(mainPanel, BorderLayout.CENTER);
 
-        JPanel listRoomsPanel = createListRoomsPanel();
-        JPanel createRoomPanel = new CreateRoomPanel(admin, this::showListAndRefresh);
-
-        mainPanel.add(listRoomsPanel, "list");
-        mainPanel.add(createRoomPanel, "create");
+        add(contentPanel, BorderLayout.CENTER);
 
         cardLayout.show(mainPanel, "list");
         loadData();
+    }
+
+    private JPanel createFilterBar() {
+        JPanel filterPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        filterPanel.setOpaque(false);
+        
+        JTextField filterField = new JTextField(30);
+        filterField.setFont(new Font("Segoe UI", Font.PLAIN, 16));
+        filterField.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(new Color(200, 200, 200)),
+            new EmptyBorder(5, 8, 5, 8)
+        ));
+
+        filterField.getDocument().addDocumentListener(new DocumentListener() {
+            public void changedUpdate(DocumentEvent e) { filter(); }
+            public void removeUpdate(DocumentEvent e) { filter(); }
+            public void insertUpdate(DocumentEvent e) { filter(); }
+            private void filter() {
+                String text = filterField.getText();
+                if (text.trim().length() == 0) {
+                    sorter.setRowFilter(null);
+                } else {
+                    sorter.setRowFilter(RowFilter.regexFilter("(?i)" + text));
+                }
+            }
+        });
+
+        filterPanel.add(new JLabel("Filter:"));
+        filterPanel.add(filterField);
+        return filterPanel;
     }
 
     private void showListAndRefresh() {
         loadData();
         cardLayout.show(mainPanel, "list");
     }
-    
-    private void showMaintenanceMessage() {
-        JOptionPane.showMessageDialog(this,
-                "Action disabled: The application is currently in maintenance mode.",
-                "Maintenance Mode",
-                JOptionPane.INFORMATION_MESSAGE);
-    }
 
     private JPanel createListRoomsPanel() {
         JPanel panel = new JPanel(new BorderLayout(10, 10));
         panel.setOpaque(false);
 
-        roomsTable = new JTable(new DefaultTableModel(new Object[]{"ID", "Building", "Capacity", "Type"}, 0));
+        DefaultTableModel model = new DefaultTableModel(new Object[]{"ID", "Building", "Capacity", "Type"}, 0);
+        roomsTable = new JTable(model);
+        sorter = new TableRowSorter<>(model);
+        roomsTable.setRowSorter(sorter);
         styleTable(roomsTable);
 
         panel.add(new JScrollPane(roomsTable), BorderLayout.CENTER);
@@ -149,25 +182,26 @@ public class RoomsPanel extends JPanel {
     }
 
     private void showUpdateRoomPanel() {
-        int row = roomsTable.getSelectedRow();
-        if (row == -1) {
+        int viewRow = roomsTable.getSelectedRow();
+        if (viewRow == -1) {
             JOptionPane.showMessageDialog(this, "Please select a room to update.", "No Selection", JOptionPane.WARNING_MESSAGE);
             return;
         }
-
-        RoomResponse room = roomList.get(row);
+        int modelRow = roomsTable.convertRowIndexToModel(viewRow);
+        RoomResponse room = roomList.get(modelRow);
         JPanel updatePanel = new UpdateRoomPanel(admin, this::showListAndRefresh, room);
         mainPanel.add(updatePanel, "updateRoom");
         cardLayout.show(mainPanel, "updateRoom");
     }
 
     private void deleteRoom() {
-        int row = roomsTable.getSelectedRow();
-        if (row == -1) {
+        int viewRow = roomsTable.getSelectedRow();
+        if (viewRow == -1) {
             JOptionPane.showMessageDialog(this, "Please select a room to delete.", "No Selection", JOptionPane.WARNING_MESSAGE);
             return;
         }
-        String roomId = roomsTable.getValueAt(row, 0).toString();
+        int modelRow = roomsTable.convertRowIndexToModel(viewRow);
+        String roomId = roomList.get(modelRow).roomId();
         if (JOptionPane.showConfirmDialog(this, "Are you sure you want to delete room " + roomId + "?", "Confirm Deletion", JOptionPane.YES_NO_OPTION) != JOptionPane.YES_OPTION) {
             return;
         }
@@ -192,6 +226,13 @@ public class RoomsPanel extends JPanel {
         worker.execute();
     }
     
+    private void showMaintenanceMessage() {
+        JOptionPane.showMessageDialog(this,
+                "Action disabled: The application is currently in maintenance mode.",
+                "Maintenance Mode",
+                JOptionPane.INFORMATION_MESSAGE);
+    }
+
     private void stylePrimaryButton(JButton button) {
         button.setFont(new Font("Segoe UI", Font.BOLD, 14));
         button.setBackground(new Color(45, 125, 200));

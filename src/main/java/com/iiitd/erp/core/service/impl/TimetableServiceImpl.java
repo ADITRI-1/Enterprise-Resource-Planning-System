@@ -2,18 +2,22 @@ package com.iiitd.erp.core.service.impl;
 
 import com.iiitd.erp.Domain.InstructorTimetableSlotDomain;
 import com.iiitd.erp.Domain.SectionDomain;
+import com.iiitd.erp.Domain.TimetableSearchSlotDomain;
 import com.iiitd.erp.core.InstructorPersistPort;
 import com.iiitd.erp.core.SectionPersistPort;
 import com.iiitd.erp.core.service.TimetableService;
 import com.iiitd.erp.exception.ErpException;
 import com.iiitd.erp.exception.ErrorCode;
 import com.iiitd.erp.persistent.entity.erp_db.ClassSchedule;
+import com.iiitd.erp.persistent.entity.erp_db.Weekday;
 import com.iiitd.erp.persistent.persistence.repository.ClassScheduleRepository;
+import com.iiitd.erp.persistent.entity.erp_db.Section;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.DayOfWeek;
 import java.util.*;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -60,6 +64,29 @@ public class TimetableServiceImpl implements TimetableService {
                 .toList();
     }
 
+    @Override
+    public List<TimetableSearchSlotDomain> search(String instructorCode,
+                                                  String courseId,
+                                                  String sectionId,
+                                                  String roomId,
+                                                  String semester,
+                                                  Integer year,
+                                                  DayOfWeek day) {
+        if (allFiltersEmpty(instructorCode, courseId, sectionId, roomId, semester, year, day)) {
+            throw ErpException.of(ErrorCode.REQUEST_VALIDATION_FAILED,
+                    Map.of("filters", "At least one filter must be provided"));
+        }
+
+        String normalizedSemester = normalizeSemester(semester);
+        Weekday weekday = day != null ? Weekday.from(day) : null;
+        List<ClassSchedule> rows = schedules.searchTimetable(instructorCode, courseId, sectionId,
+                roomId, normalizedSemester, year, weekday);
+
+        return rows.stream()
+                .map(cs -> toSearchDomain(cs, cs.getSection()))
+                .toList();
+    }
+
     private void ensureInstructorExists(String instructorCode) {
         if (instructors.findByInstructorCode(instructorCode) == null) {
             LOGGER.warn("Instructor {} not found when building timetable", instructorCode);
@@ -85,5 +112,38 @@ public class TimetableServiceImpl implements TimetableService {
                 .endTime(cs.getEndTime())
                 .roomId(cs.getRoomId())
                 .build();
+    }
+
+    private TimetableSearchSlotDomain toSearchDomain(ClassSchedule cs, Section section) {
+        if (section == null) {
+            throw ErpException.of(ErrorCode.SECTION_NOT_FOUND, Map.of("sectionId", cs.getSectionId()));
+        }
+        return TimetableSearchSlotDomain.builder()
+                .sectionId(section.getSectionId())
+                .courseId(section.getCourseId())
+                .instructorCode(section.getInstructorCode())
+                .semester(section.getSemester())
+                .year(section.getYear())
+                .day(cs.getDayOfWeek().toJava())
+                .startTime(cs.getStartTime())
+                .endTime(cs.getEndTime())
+                .roomId(cs.getRoomId())
+                .build();
+    }
+
+    private boolean allFiltersEmpty(String instructorCode,
+                                    String courseId,
+                                    String sectionId,
+                                    String roomId,
+                                    String semester,
+                                    Integer year,
+                                    DayOfWeek day) {
+        return (instructorCode == null || instructorCode.isBlank())
+                && (courseId == null || courseId.isBlank())
+                && (sectionId == null || sectionId.isBlank())
+                && (roomId == null || roomId.isBlank())
+                && (semester == null || semester.isBlank())
+                && year == null
+                && day == null;
     }
 }

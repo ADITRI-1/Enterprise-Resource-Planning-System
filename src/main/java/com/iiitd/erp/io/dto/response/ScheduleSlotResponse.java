@@ -13,5 +13,5 @@ public record ScheduleSlotResponse(
         LocalTime startTime,
         LocalTime endTime,
         String roomId,
-        String roomNumber,
+        String building,
         Integer roomCapacity) {}

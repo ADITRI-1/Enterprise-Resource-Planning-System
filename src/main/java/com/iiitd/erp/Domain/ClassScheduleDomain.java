@@ -18,6 +18,6 @@ public class ClassScheduleDomain {
     private LocalTime startTime;
     private LocalTime endTime;
     private String roomId;
-    private String roomNumber;
+    private String building;
     private Integer roomCapacity;
 }

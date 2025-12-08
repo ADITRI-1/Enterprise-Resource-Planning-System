@@ -6,7 +6,10 @@ import com.iiitd.erp.ui.client.AdminClient;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
 import javax.swing.table.DefaultTableModel;
+import javax.swing.table.TableRowSorter;
 import java.awt.*;
 import java.util.ArrayList;
 import java.util.List;
@@ -19,36 +22,82 @@ public class UsersPanel extends JPanel {
     private final CardLayout cardLayout = new CardLayout();
     private final JPanel mainPanel = new JPanel(cardLayout);
     private JTable studentTable, instructorTable;
+    private TableRowSorter<DefaultTableModel> studentSorter, instructorSorter;
     private List<StudentResponse> studentList = new ArrayList<>();
     private List<InstructorResponse> instructorList = new ArrayList<>();
     private final static Logger LOGGER = Logger.getLogger(UsersPanel.class.getName());
     private final boolean isMaintenanceMode;
+    private final JTabbedPane tabs = new JTabbedPane();
 
     public UsersPanel(AdminClient admin, boolean maintenanceMode) {
         this.admin = admin;
         this.isMaintenanceMode = maintenanceMode;
         setOpaque(false);
-        setLayout(new BorderLayout());
+        setLayout(new BorderLayout(0, 15));
         setBorder(new EmptyBorder(10, 20, 10, 20));
 
         JLabel title = new JLabel("User Management");
         title.setFont(new Font("Segoe UI", Font.BOLD, 32));
         title.setForeground(new Color(40, 50, 65));
-        title.setBorder(new EmptyBorder(10, 0, 20, 0));
+        title.setBorder(new EmptyBorder(10, 0, 10, 0));
         add(title, BorderLayout.NORTH);
 
-        add(mainPanel, BorderLayout.CENTER);
+        JPanel contentPanel = new JPanel(new BorderLayout(0, 10));
+        contentPanel.setOpaque(false);
+        
+        contentPanel.add(createFilterBar(), BorderLayout.NORTH);
+        
+        mainPanel.add(createListUsersPanel(), "list");
+        mainPanel.add(new CreateStudentPanel(admin, this::showListAndRefresh), "createStudent");
+        mainPanel.add(new CreateInstructorPanel(admin, this::showListAndRefresh), "createInstructor");
+        contentPanel.add(mainPanel, BorderLayout.CENTER);
 
-        JPanel listUsersPanel = createListUsersPanel();
-        JPanel createStudentPanel = new CreateStudentPanel(admin, this::showListAndRefresh);
-        JPanel createInstructorPanel = new CreateInstructorPanel(admin, this::showListAndRefresh);
-
-        mainPanel.add(listUsersPanel, "list");
-        mainPanel.add(createStudentPanel, "createStudent");
-        mainPanel.add(createInstructorPanel, "createInstructor");
+        add(contentPanel, BorderLayout.CENTER);
 
         cardLayout.show(mainPanel, "list");
         loadData();
+    }
+
+    private JPanel createFilterBar() {
+        JPanel filterPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        filterPanel.setOpaque(false);
+        
+        JTextField filterField = new JTextField(30);
+        filterField.setFont(new Font("Segoe UI", Font.PLAIN, 16));
+        filterField.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(new Color(200, 200, 200)),
+            new EmptyBorder(5, 8, 5, 8)
+        ));
+
+        filterField.getDocument().addDocumentListener(new DocumentListener() {
+            @Override
+            public void insertUpdate(DocumentEvent e) { filter(); }
+            @Override
+            public void removeUpdate(DocumentEvent e) { filter(); }
+            @Override
+            public void changedUpdate(DocumentEvent e) { filter(); }
+
+            private void filter() {
+                String text = filterField.getText();
+                if (tabs.getSelectedIndex() == 0) { // Students tab
+                    if (text.trim().length() == 0) {
+                        studentSorter.setRowFilter(null);
+                    } else {
+                        studentSorter.setRowFilter(RowFilter.regexFilter("(?i)" + text));
+                    }
+                } else { // Instructors tab
+                    if (text.trim().length() == 0) {
+                        instructorSorter.setRowFilter(null);
+                    } else {
+                        instructorSorter.setRowFilter(RowFilter.regexFilter("(?i)" + text));
+                    }
+                }
+            }
+        });
+
+        filterPanel.add(new JLabel("Filter:"));
+        filterPanel.add(filterField);
+        return filterPanel;
     }
 
     private void showListAndRefresh() {
@@ -68,15 +117,11 @@ public class UsersPanel extends JPanel {
                 JOptionPane.INFORMATION_MESSAGE);
     }
 
-    private JPanel createListUsersPanel() {
-        JTabbedPane tabs = new JTabbedPane();
+    private JComponent createListUsersPanel() {
         tabs.setFont(new Font("Segoe UI", Font.PLAIN, 16));
         tabs.addTab("Students", createStudentTab());
         tabs.addTab("Instructors", createInstructorTab());
-        
-        JPanel panel = new JPanel(new BorderLayout());
-        panel.add(tabs, BorderLayout.CENTER);
-        return panel;
+        return tabs;
     }
 
     private JPanel createStudentTab() {
@@ -84,7 +129,10 @@ public class UsersPanel extends JPanel {
         panel.setOpaque(false);
         panel.setBorder(new EmptyBorder(10, 10, 10, 10));
 
-        studentTable = new JTable(new DefaultTableModel(new Object[]{"Roll", "Name", "Program", "Year", "DOB"}, 0));
+        DefaultTableModel studentModel = new DefaultTableModel(new Object[]{"Roll", "Name", "Program", "Year", "DOB"}, 0);
+        studentTable = new JTable(studentModel);
+        studentSorter = new TableRowSorter<>(studentModel);
+        studentTable.setRowSorter(studentSorter);
         styleTable(studentTable);
         
         panel.add(new JScrollPane(studentTable), BorderLayout.CENTER);
@@ -97,7 +145,10 @@ public class UsersPanel extends JPanel {
         panel.setOpaque(false);
         panel.setBorder(new EmptyBorder(10, 10, 10, 10));
 
-        instructorTable = new JTable(new DefaultTableModel(new Object[]{"Code", "Name", "Dept", "DOB", "Email", "Phone"}, 0));
+        DefaultTableModel instructorModel = new DefaultTableModel(new Object[]{"Code", "Name", "Dept", "DOB", "Email", "Phone"}, 0);
+        instructorTable = new JTable(instructorModel);
+        instructorSorter = new TableRowSorter<>(instructorModel);
+        instructorTable.setRowSorter(instructorSorter);
         styleTable(instructorTable);
 
         panel.add(new JScrollPane(instructorTable), BorderLayout.CENTER);
@@ -215,38 +266,39 @@ public class UsersPanel extends JPanel {
     }
 
     private void showUpdateStudentPanel() {
-        int row = studentTable.getSelectedRow();
-        if (row == -1) {
+        int viewRow = studentTable.getSelectedRow();
+        if (viewRow == -1) {
             JOptionPane.showMessageDialog(this, "Please select a student to update.", "No Selection", JOptionPane.WARNING_MESSAGE);
             return;
         }
-        
-        StudentResponse student = studentList.get(row);
+        int modelRow = studentTable.convertRowIndexToModel(viewRow);
+        StudentResponse student = studentList.get(modelRow);
         JPanel updatePanel = new UpdateStudentPanel(admin, this::showListAndRefresh, student);
         mainPanel.add(updatePanel, "updateStudent");
         cardLayout.show(mainPanel, "updateStudent");
     }
 
     private void showUpdateInstructorPanel() {
-        int row = instructorTable.getSelectedRow();
-        if (row == -1) {
+        int viewRow = instructorTable.getSelectedRow();
+        if (viewRow == -1) {
             JOptionPane.showMessageDialog(this, "Please select an instructor to update.", "No Selection", JOptionPane.WARNING_MESSAGE);
             return;
         }
-
-        InstructorResponse instructor = instructorList.get(row);
+        int modelRow = instructorTable.convertRowIndexToModel(viewRow);
+        InstructorResponse instructor = instructorList.get(modelRow);
         JPanel updatePanel = new UpdateInstructorPanel(admin, this::showListAndRefresh, instructor);
         mainPanel.add(updatePanel, "updateInstructor");
         cardLayout.show(mainPanel, "updateInstructor");
     }
 
     private void deleteStudent() {
-        int row = studentTable.getSelectedRow();
-        if (row == -1) {
+        int viewRow = studentTable.getSelectedRow();
+        if (viewRow == -1) {
             JOptionPane.showMessageDialog(this, "Please select a student to delete.", "No Selection", JOptionPane.WARNING_MESSAGE);
             return;
         }
-        String roll = studentTable.getValueAt(row, 0).toString();
+        int modelRow = studentTable.convertRowIndexToModel(viewRow);
+        String roll = studentList.get(modelRow).rollNo().toString();
         if (JOptionPane.showConfirmDialog(this, "Are you sure you want to delete student " + roll + "?", "Confirm Deletion", JOptionPane.YES_NO_OPTION) != JOptionPane.YES_OPTION) {
             return;
         }
@@ -272,12 +324,13 @@ public class UsersPanel extends JPanel {
     }
 
     private void deleteInstructor() {
-        int row = instructorTable.getSelectedRow();
-        if (row == -1) {
+        int viewRow = instructorTable.getSelectedRow();
+        if (viewRow == -1) {
             JOptionPane.showMessageDialog(this, "Please select an instructor to delete.", "No Selection", JOptionPane.WARNING_MESSAGE);
             return;
         }
-        String code = instructorTable.getValueAt(row, 0).toString();
+        int modelRow = instructorTable.convertRowIndexToModel(viewRow);
+        String code = instructorList.get(modelRow).instructorCode();
         if (JOptionPane.showConfirmDialog(this, "Are you sure you want to delete instructor " + code + "?", "Confirm Deletion", JOptionPane.YES_NO_OPTION) != JOptionPane.YES_OPTION) {
             return;
         }

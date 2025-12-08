@@ -35,7 +35,7 @@ public interface EntityToDomainMapper {
     SectionDomain sectionToSectionDomain(Section section);
 
     @Mapping(target = "dayOfWeek", expression = "java(fromWeekday(classSchedule.getDayOfWeek()))")
-    @Mapping(target = "roomNumber", ignore = true)
+//    @Mapping(target = "roomNumber", ignore = true)
     @Mapping(target = "roomCapacity", ignore = true)
     ClassScheduleDomain classScheduleToClassScheduleDomain(ClassSchedule classSchedule);
 

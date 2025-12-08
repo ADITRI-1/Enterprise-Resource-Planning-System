@@ -56,6 +56,7 @@ public class AvailabilityServiceImpl implements AvailabilityService {
                 .filter(room -> schedules.roomConflicts(room.getRoomId(), weekday, start, end, null).isEmpty())
                 .map(room -> RoomAvailabilityResponse.builder()
                         .roomId(room.getRoomId())
+                        .building(room.getBuilding())
                         .capacity(room.getCapacity())
                         .build())
                 .toList();

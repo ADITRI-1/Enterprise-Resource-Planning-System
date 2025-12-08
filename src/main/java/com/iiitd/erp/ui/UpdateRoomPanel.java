@@ -39,7 +39,7 @@ public class UpdateRoomPanel extends JPanel {
         ));
 
         // Header
-        JLabel title = new JLabel("Update Room: " + room.roomNumber(), SwingConstants.CENTER);
+        JLabel title = new JLabel("Update Room: " + room.roomId(), SwingConstants.CENTER);
         title.setFont(new Font("Segoe UI", Font.BOLD, 32));
         title.setForeground(new Color(40, 50, 65));
         formContainer.add(title, BorderLayout.NORTH);

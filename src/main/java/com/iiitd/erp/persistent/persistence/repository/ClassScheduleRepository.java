@@ -58,4 +58,24 @@ public interface ClassScheduleRepository extends JpaRepository<ClassSchedule, UU
 
 
     List<ClassSchedule> findBySectionIdInOrderByDayOfWeekAscStartTimeAsc(List<String> sectionIds);
+
+    @Query("""
+           select cs from ClassSchedule cs
+           join fetch cs.section s
+           where (:instructorCode is null or s.instructorCode = :instructorCode)
+             and (:courseId is null or s.courseId = :courseId)
+             and (:sectionId is null or s.sectionId = :sectionId)
+             and (:roomId is null or cs.roomId = :roomId)
+             and (:semester is null or s.semester = :semester)
+             and (:year is null or s.year = :year)
+             and (:day is null or cs.dayOfWeek = :day)
+           order by cs.dayOfWeek, cs.startTime
+           """)
+    List<ClassSchedule> searchTimetable(@Param("instructorCode") String instructorCode,
+                                        @Param("courseId") String courseId,
+                                        @Param("sectionId") String sectionId,
+                                        @Param("roomId") String roomId,
+                                        @Param("semester") String semester,
+                                        @Param("year") Integer year,
+                                        @Param("day") Weekday day);
 }

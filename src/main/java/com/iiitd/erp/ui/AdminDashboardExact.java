@@ -23,16 +23,6 @@ public class AdminDashboardExact extends JFrame {
     private JCheckBox maintenanceModeBox;
     private final boolean isMaintenanceMode;
 
-    public static void main(String[] args) {
-        SwingUtilities.invokeLater(() -> {
-            try {
-                System.setProperty("awt.useSystemAAFontSettings", "on");
-                System.setProperty("swing.aatext", "true");
-            } catch (Exception ignored) {}
-            new AdminDashboardExact().setVisible(true);
-        });
-    }
-
     public AdminDashboardExact() { this(null, false); }
 
     public AdminDashboardExact(AdminClient admin, boolean maintenanceMode) {
@@ -51,7 +41,6 @@ public class AdminDashboardExact extends JFrame {
         add(buildMain(), BorderLayout.CENTER);
         add(new FooterBar(), BorderLayout.SOUTH);
 
-        // Set initial view
         cardLayout.show(mainContentPanel, "Dashboard");
         leftRail.setSelected("Dashboard");
         
@@ -68,8 +57,7 @@ public class AdminDashboardExact extends JFrame {
         maintenanceModeBox.setFont(new Font("Segoe UI", Font.BOLD, 14));
         maintenanceModeBox.setOpaque(false);
         maintenanceModeBox.addActionListener(e -> toggleMaintenanceMode());
-        maintenanceModeBox.setEnabled(!isMaintenanceMode); // Disable if in maintenance mode
-
+        
         JButton logout = new JButton("Logout");
         logout.setFont(new Font("Segoe UI", Font.BOLD, 14));
         logout.setFocusPainted(false);
@@ -118,20 +106,18 @@ public class AdminDashboardExact extends JFrame {
         LOGGER.info("Switching to view: " + viewName);
         
         JPanel panel = panels.get(viewName);
-        // The refresh logic can be simplified if each panel handles its own data loading
-        // For now, this explicit check remains.
         if (panel instanceof UsersPanel) {
             ((UsersPanel) panel).loadData();
         } else if (panel instanceof CoursesPanel) {
-             ((CoursesPanel) panel).loadData();
+            ((CoursesPanel) panel).loadData();
         } else if (panel instanceof ProgramsPanel) {
-             ((ProgramsPanel) panel).loadData();
+            ((ProgramsPanel) panel).loadData();
         } else if (panel instanceof DepartmentsPanel) {
-             ((DepartmentsPanel) panel).loadData();
+            ((DepartmentsPanel) panel).loadData();
         } else if (panel instanceof RoomsPanel) {
-             ((RoomsPanel) panel).loadData();
+            ((RoomsPanel) panel).loadData();
         } else if (panel instanceof SectionsPanel) {
-             ((SectionsPanel) panel).loadData();
+            ((SectionsPanel) panel).loadData();
         }
 
         cardLayout.show(mainContentPanel, viewName);
@@ -149,6 +135,9 @@ public class AdminDashboardExact extends JFrame {
                 try {
                     MaintenanceStatusResponse status = get();
                     maintenanceModeBox.setSelected(status.maintenanceOn());
+                    if (status.maintenanceOn()) {
+                        maintenanceModeBox.setEnabled(false);
+                    }
                 } catch (Exception e) {
                     LOGGER.log(Level.SEVERE, "Failed to fetch maintenance status", e);
                 }
@@ -159,6 +148,12 @@ public class AdminDashboardExact extends JFrame {
 
     private void toggleMaintenanceMode() {
         boolean isEnabled = maintenanceModeBox.isSelected();
+        if (isMaintenanceMode) {
+            JOptionPane.showMessageDialog(this, "Action disabled: The application is currently in maintenance mode.", "Maintenance Mode", JOptionPane.INFORMATION_MESSAGE);
+            maintenanceModeBox.setSelected(true);
+            return;
+        }
+
         SwingWorker<Void, Void> worker = new SwingWorker<>() {
             @Override
             protected Void doInBackground() throws Exception {
@@ -168,10 +163,13 @@ public class AdminDashboardExact extends JFrame {
             @Override
             protected void done() {
                 try {
-                    get(); // To catch any exceptions
+                    get();
                     JOptionPane.showMessageDialog(AdminDashboardExact.this,
                             "Maintenance mode is now " + (isEnabled ? "ON" : "OFF") + ". Please restart the application to see changes.",
                             "Status Updated", JOptionPane.INFORMATION_MESSAGE);
+                    if (isEnabled) {
+                        maintenanceModeBox.setEnabled(false);
+                    }
                 } catch (Exception e) {
                     LOGGER.log(Level.SEVERE, "Failed to toggle maintenance mode", e);
                     JOptionPane.showMessageDialog(AdminDashboardExact.this,
@@ -183,8 +181,6 @@ public class AdminDashboardExact extends JFrame {
         };
         worker.execute();
     }
-
-    // ---------- Inner classes (DashboardPanel, LeftRail, etc.) remain the same ----------
 
     class DashboardPanel extends JPanel {
         DashboardPanel() {

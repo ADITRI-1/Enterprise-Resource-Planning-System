@@ -7,7 +7,7 @@ import com.iiitd.erp.ui.client.InstructorClient;
 import com.iiitd.erp.ui.client.StudentClient;
 import com.iiitd.erp.ui.AdminDashboardExact;
 import com.iiitd.erp.ui.InstructorDashboardWindow;
-import com.iiitd.erp.ui.StudentDashboardWindow;
+import com.iiitd.erp.ui.StudentDashboard;
 
 import javax.swing.*;
 import java.awt.*;
@@ -215,7 +215,7 @@ public class LoginUI extends JFrame {
         switch (result.role().toUpperCase()) {
             case "STUDENT" -> SwingUtilities.invokeLater(() -> {
                 studentClient.setCookieHeader(result.cookieHeader());
-                new StudentDashboardWindow(studentClient, result.maintenanceMode()).setVisible(true);
+                new StudentDashboard(studentClient, result.maintenanceMode()).setVisible(true);
             });
             case "INSTRUCTOR" -> SwingUtilities.invokeLater(() -> {
                 instructorClient.setCookieHeader(result.cookieHeader());

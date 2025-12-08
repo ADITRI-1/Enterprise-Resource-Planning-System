@@ -6,4 +6,4 @@ import java.util.UUID;
 
 
 @Builder
-public record RoomAvailabilityResponse(String roomId, String roomName, int capacity) {}
+public record RoomAvailabilityResponse(String roomId, String building, int capacity) {}

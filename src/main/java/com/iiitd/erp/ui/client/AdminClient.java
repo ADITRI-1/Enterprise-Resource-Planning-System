@@ -15,12 +15,18 @@ import java.nio.charset.StandardCharsets;
 import java.time.DayOfWeek;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.Map;
+import java.net.URLEncoder;
+import java.util.logging.Level;
+import java.util.logging.Logger;
+
 
 public class AdminClient {
 
     private final String baseUrl;
     private final String cookieHeader;
     private final ObjectMapper mapper;
+    private static final Logger LOGGER = Logger.getLogger(AdminClient.class.getName());
 
     public AdminClient(String baseUrl, String cookieHeader) {
         this.baseUrl = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
@@ -135,8 +141,14 @@ public class AdminClient {
     }
 
     // Section schedule
-    public SectionScheduleResponse viewSchedule(String sectionId) throws IOException {
+    public SectionScheduleResponse viewScheduleForSection(String sectionId) throws IOException {
         return send("GET", "/api/admin/sections/" + sectionId + "/schedule", null, new TypeReference<>() {});
+    }
+    public SectionScheduleResponse viewScheduleForRoom(String roomId) throws IOException {
+        return send("GET", "/api/admin/rooms/" + roomId + "/schedule", null, new TypeReference<>() {});
+    }
+    public SectionScheduleResponse viewScheduleForInstructor(String instructorId) throws IOException {
+        return send("GET", "/api/admin/instructors/" + instructorId + "/schedule", null, new TypeReference<>() {});
     }
     public SectionScheduleResponse upsertSchedule(String sectionId, SectionScheduleRequest req) throws IOException {
         return send("PUT", "/api/admin/sections/" + sectionId + "/schedule", req, new TypeReference<>() {});
@@ -144,6 +156,24 @@ public class AdminClient {
     public void clearSchedule(String sectionId) throws IOException {
         sendVoid("DELETE", "/api/admin/sections/" + sectionId + "/schedule", null);
     }
+
+    // Generic Timetable Search
+    public List<TimetableSearchSlotResponse> searchTimetable(Map<String, String> filters) throws IOException {
+        StringBuilder query = new StringBuilder();
+        filters.forEach((key, value) -> {
+            if (value != null && !value.isEmpty()) {
+                if (query.length() == 0) query.append("?");
+                else query.append("&");
+                try {
+                    query.append(key).append("=").append(URLEncoder.encode(value, StandardCharsets.UTF_8.toString()));
+                } catch (IOException e) {
+                    LOGGER.log(Level.SEVERE, "Failed to encode URL parameter", e);
+                }
+            }
+        });
+        return send("GET", "/api/admin/timetable" + query.toString(), null, new TypeReference<>() {});
+    }
+
 
     // Availability
     public List<RoomAvailabilityResponse> availableRooms(DayOfWeek day, LocalTime start, LocalTime end, int minCapacity) throws IOException {

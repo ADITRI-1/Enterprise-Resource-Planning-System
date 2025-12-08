@@ -5,7 +5,10 @@ import com.iiitd.erp.ui.client.AdminClient;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
+import javax.swing.event.DocumentEvent;
+import javax.swing.event.DocumentListener;
 import javax.swing.table.DefaultTableModel;
+import javax.swing.table.TableRowSorter;
 import java.awt.*;
 import java.util.ArrayList;
 import java.util.List;
@@ -18,6 +21,7 @@ public class SectionsPanel extends JPanel {
     private final CardLayout cardLayout = new CardLayout();
     private final JPanel mainPanel = new JPanel(cardLayout);
     private JTable sectionsTable;
+    private TableRowSorter<DefaultTableModel> sorter;
     private List<SectionResponse> sectionList = new ArrayList<>();
     private static final Logger LOGGER = Logger.getLogger(SectionsPanel.class.getName());
     private final boolean isMaintenanceMode;
@@ -26,44 +30,73 @@ public class SectionsPanel extends JPanel {
         this.admin = admin;
         this.isMaintenanceMode = maintenanceMode;
         setOpaque(false);
-        setLayout(new BorderLayout());
+        setLayout(new BorderLayout(0, 15));
         setBorder(new EmptyBorder(10, 20, 10, 20));
 
         JLabel title = new JLabel("Section Management");
         title.setFont(new Font("Segoe UI", Font.BOLD, 32));
         title.setForeground(new Color(40, 50, 65));
-        title.setBorder(new EmptyBorder(10, 0, 20, 0));
+        title.setBorder(new EmptyBorder(10, 0, 10, 0));
         add(title, BorderLayout.NORTH);
 
-        add(mainPanel, BorderLayout.CENTER);
+        JPanel contentPanel = new JPanel(new BorderLayout(0, 10));
+        contentPanel.setOpaque(false);
+        
+        contentPanel.add(createFilterBar(), BorderLayout.NORTH);
+        
+        mainPanel.add(createListSectionsPanel(), "list");
+        mainPanel.add(new CreateSectionPanel(admin, this::showListAndRefresh), "create");
+        contentPanel.add(mainPanel, BorderLayout.CENTER);
 
-        JPanel listSectionsPanel = createListSectionsPanel();
-        JPanel createSectionPanel = new CreateSectionPanel(admin, this::showListAndRefresh);
-
-        mainPanel.add(listSectionsPanel, "list");
-        mainPanel.add(createSectionPanel, "create");
+        add(contentPanel, BorderLayout.CENTER);
 
         cardLayout.show(mainPanel, "list");
         loadData();
+    }
+
+    private JPanel createFilterBar() {
+        JPanel filterPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+        filterPanel.setOpaque(false);
+        
+        JTextField filterField = new JTextField(30);
+        filterField.setFont(new Font("Segoe UI", Font.PLAIN, 16));
+        filterField.setBorder(BorderFactory.createCompoundBorder(
+            BorderFactory.createLineBorder(new Color(200, 200, 200)),
+            new EmptyBorder(5, 8, 5, 8)
+        ));
+
+        filterField.getDocument().addDocumentListener(new DocumentListener() {
+            public void changedUpdate(DocumentEvent e) { filter(); }
+            public void removeUpdate(DocumentEvent e) { filter(); }
+            public void insertUpdate(DocumentEvent e) { filter(); }
+            private void filter() {
+                String text = filterField.getText();
+                if (text.trim().length() == 0) {
+                    sorter.setRowFilter(null);
+                } else {
+                    sorter.setRowFilter(RowFilter.regexFilter("(?i)" + text));
+                }
+            }
+        });
+
+        filterPanel.add(new JLabel("Filter:"));
+        filterPanel.add(filterField);
+        return filterPanel;
     }
 
     private void showListAndRefresh() {
         loadData();
         cardLayout.show(mainPanel, "list");
     }
-    
-    private void showMaintenanceMessage() {
-        JOptionPane.showMessageDialog(this,
-                "Action disabled: The application is currently in maintenance mode.",
-                "Maintenance Mode",
-                JOptionPane.INFORMATION_MESSAGE);
-    }
 
     private JPanel createListSectionsPanel() {
         JPanel panel = new JPanel(new BorderLayout(10, 10));
         panel.setOpaque(false);
 
-        sectionsTable = new JTable(new DefaultTableModel(new Object[]{"ID", "Course", "Instructor", "Semester", "Year", "Capacity"}, 0));
+        DefaultTableModel model = new DefaultTableModel(new Object[]{"ID", "Course", "Instructor", "Semester", "Year", "Capacity"}, 0);
+        sectionsTable = new JTable(model);
+        sorter = new TableRowSorter<>(model);
+        sectionsTable.setRowSorter(sorter);
         styleTable(sectionsTable);
 
         panel.add(new JScrollPane(sectionsTable), BorderLayout.CENTER);
@@ -149,25 +182,26 @@ public class SectionsPanel extends JPanel {
     }
 
     private void showUpdateSectionPanel() {
-        int row = sectionsTable.getSelectedRow();
-        if (row == -1) {
+        int viewRow = sectionsTable.getSelectedRow();
+        if (viewRow == -1) {
             JOptionPane.showMessageDialog(this, "Please select a section to update.", "No Selection", JOptionPane.WARNING_MESSAGE);
             return;
         }
-
-        SectionResponse section = sectionList.get(row);
+        int modelRow = sectionsTable.convertRowIndexToModel(viewRow);
+        SectionResponse section = sectionList.get(modelRow);
         JPanel updatePanel = new UpdateSectionPanel(admin, this::showListAndRefresh, section);
         mainPanel.add(updatePanel, "updateSection");
         cardLayout.show(mainPanel, "updateSection");
     }
 
     private void deleteSection() {
-        int row = sectionsTable.getSelectedRow();
-        if (row == -1) {
+        int viewRow = sectionsTable.getSelectedRow();
+        if (viewRow == -1) {
             JOptionPane.showMessageDialog(this, "Please select a section to delete.", "No Selection", JOptionPane.WARNING_MESSAGE);
             return;
         }
-        String sectionId = sectionsTable.getValueAt(row, 0).toString();
+        int modelRow = sectionsTable.convertRowIndexToModel(viewRow);
+        String sectionId = sectionList.get(modelRow).sectionId();
         if (JOptionPane.showConfirmDialog(this, "Are you sure you want to delete section " + sectionId + "?", "Confirm Deletion", JOptionPane.YES_NO_OPTION) != JOptionPane.YES_OPTION) {
             return;
         }
@@ -192,6 +226,13 @@ public class SectionsPanel extends JPanel {
         worker.execute();
     }
     
+    private void showMaintenanceMessage() {
+        JOptionPane.showMessageDialog(this,
+                "Action disabled: The application is currently in maintenance mode.",
+                "Maintenance Mode",
+                JOptionPane.INFORMATION_MESSAGE);
+    }
+
     private void stylePrimaryButton(JButton button) {
         button.setFont(new Font("Segoe UI", Font.BOLD, 14));
         button.setBackground(new Color(45, 125, 200));

@@ -44,6 +44,7 @@ public class AdminController {
     private final SectionService sectionService;
     private final AvailabilityService availabilityService;
     private final SectionScheduleService sectionScheduleService;
+    private final TimetableService timetableService;
 
 
     public AdminController(StudentService studentService,
@@ -55,7 +56,8 @@ public class AdminController {
                            MaintenanceService maintenanceService,
                            SectionService sectionService,
                            AvailabilityService availabilityService,
-                           SectionScheduleService sectionScheduleService) {
+                           SectionScheduleService sectionScheduleService,
+                           TimetableService timetableService) {
         this.studentService = studentService;
         this.instructorService = instructorService;
         this.programService = programService;
@@ -66,6 +68,7 @@ public class AdminController {
         this.sectionService = sectionService;
         this.availabilityService = availabilityService;
         this.sectionScheduleService = sectionScheduleService;
+        this.timetableService = timetableService;
     }
 
     // ----- Student listing + CRUD -----
@@ -796,6 +799,8 @@ public class AdminController {
         if (!isAdmin(auth)) {
             return error(HttpStatus.FORBIDDEN, ErrorCode.ADMIN_FORBIDDEN);
         }
+        LOGGER.info("Schedule upsert for section {}: {} slot(s) -> {}", sectionId,
+                request.slots() == null ? 0 : request.slots().size(), request);
         try {
             List<ClassScheduleDomain> slots = request.slots().stream()
                     .map(REQUEST_TO_DOMAIN_MAPPER_INSTANCE::scheduleSlotRequestToDomain)
@@ -817,6 +822,7 @@ public class AdminController {
         if (!isAdmin(auth)) {
             return error(HttpStatus.FORBIDDEN, ErrorCode.ADMIN_FORBIDDEN);
         }
+        LOGGER.info("Schedule clear requested for section {}", sectionId);
         try {
             sectionScheduleService.clear(sectionId);
             return ResponseEntity.ok(Map.of("sectionId", sectionId, "deleted", true));
@@ -825,6 +831,36 @@ public class AdminController {
         } catch (Exception ex) {
             LOGGER.error("Unexpected error clearing schedule for {}", sectionId, ex);
             return error(HttpStatus.INTERNAL_SERVER_ERROR, ErrorCode.SECTION_DELETE_FAILED);
+        }
+    }
+
+    @GetMapping("/timetable")
+    public ResponseEntity<?> searchTimetable(@RequestParam(required = false) String instructorCode,
+                                             @RequestParam(required = false) String courseId,
+                                             @RequestParam(required = false) String sectionId,
+                                             @RequestParam(required = false) String roomId,
+                                             @RequestParam(required = false) String semester,
+                                             @RequestParam(required = false) Integer year,
+                                             @RequestParam(required = false) DayOfWeek day) {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (!isAdmin(auth)) {
+            LOGGER.warn("Unauthorized timetable search by {}", auth != null ? auth.getName() : "anonymous");
+            return error(HttpStatus.FORBIDDEN, ErrorCode.ADMIN_FORBIDDEN);
+        }
+        LOGGER.info("Timetable search requested instructor={} course={} section={} room={} semester={} year={} day={}",
+                instructorCode, courseId, sectionId, roomId, semester, year, day);
+        try {
+            List<TimetableSearchSlotResponse> response = timetableService.search(
+                            instructorCode, courseId, sectionId, roomId, semester, year, day)
+                    .stream()
+                    .map(DOMAIN_TO_RESPONSE_MAPPER_INSTANCE::timetableSearchSlotDomainToResponse)
+                    .toList();
+            return ResponseEntity.ok(response);
+        } catch (ErpException ex) {
+            return from(ex);
+        } catch (Exception ex) {
+            LOGGER.error("Unexpected error searching timetable", ex);
+            return error(HttpStatus.INTERNAL_SERVER_ERROR, ErrorCode.UNEXPECTED_SERVER_ERROR);
         }
     }
 
