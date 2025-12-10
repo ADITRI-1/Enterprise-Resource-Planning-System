@@ -1,6 +1,6 @@
 package com.iiitd.erp.ui;
 
-import com.iiitd.erp.io.dto.response.SectionResponse;
+import com.iiitd.erp.io.dto.response.SectionRow;
 import com.iiitd.erp.ui.client.StudentClient;
 
 import javax.swing.*;
@@ -20,7 +20,7 @@ public class CourseCatalogPanel extends JPanel {
     private final StudentClient student;
     private JTable coursesTable;
     private TableRowSorter<DefaultTableModel> sorter;
-    private List<SectionResponse> sectionList = new ArrayList<>();
+    private List<SectionRow> sectionList = new ArrayList<>();
     private static final Logger LOGGER = Logger.getLogger(CourseCatalogPanel.class.getName());
     private final boolean isMaintenanceMode;
 
@@ -85,7 +85,7 @@ public class CourseCatalogPanel extends JPanel {
         JPanel panel = new JPanel(new BorderLayout(10, 10));
         panel.setOpaque(false);
 
-        DefaultTableModel model = new DefaultTableModel(new Object[]{"Code", "Title", "Credits", "Capacity", "Instructor"}, 0);
+        DefaultTableModel model = new DefaultTableModel(new Object[]{"Course", "Instructor", "Capacity", "Available", "Semester", "Year"}, 0);
         coursesTable = new JTable(model);
         sorter = new TableRowSorter<>(model);
         coursesTable.setRowSorter(sorter);
@@ -122,12 +122,12 @@ public class CourseCatalogPanel extends JPanel {
     }
 
     public void loadData() {
-        SwingWorker<List<SectionResponse>, Void> worker = new SwingWorker<>() {
+        SwingWorker<List<SectionRow>, Void> worker = new SwingWorker<>() {
             @Override
-            protected List<SectionResponse> doInBackground() {
+            protected List<SectionRow> doInBackground() {
                 try {
                     LOGGER.info("Loading course sections");
-                    return student.getCourseCatalog();
+                    return student.courseCatalog();
                 } catch (Exception e) {
                     LOGGER.log(Level.SEVERE, "Failed to load course sections", e);
                     return null;
@@ -141,7 +141,14 @@ public class CourseCatalogPanel extends JPanel {
                     DefaultTableModel model = (DefaultTableModel) coursesTable.getModel();
                     model.setRowCount(0);
                     if (sectionList != null) {
-                        sectionList.forEach(s -> model.addRow(new Object[]{s.getCourseId(), s.getCourseTitle(), s.getCredits(), s.getCapacity(), s.getInstructorName()}));
+                        sectionList.forEach(s -> model.addRow(new Object[]{
+                                s.courseId(),
+                                s.instructorName(),
+                                s.capacity(),
+                                s.available(),
+                                s.semester(),
+                                s.year()
+                        }));
                     }
                 } catch (Exception e) {
                     LOGGER.log(Level.SEVERE, "Failed to update course catalog table", e);
@@ -158,23 +165,23 @@ public class CourseCatalogPanel extends JPanel {
             return;
         }
         int modelRow = coursesTable.convertRowIndexToModel(viewRow);
-        SectionResponse section = sectionList.get(modelRow);
+        SectionRow section = sectionList.get(modelRow);
         
         SwingWorker<Void, Void> worker = new SwingWorker<>() {
             @Override
             protected Void doInBackground() {
                 try {
-                    LOGGER.info("Registering for course: " + section.getCourseId());
-                    student.registerCourse(section.getSectionId());
+                    LOGGER.info("Registering for course: " + section.courseId());
+                    student.registerCourse(section.sectionId());
                 } catch (Exception ex) {
-                    LOGGER.log(Level.SEVERE, "Failed to register for course " + section.getCourseId(), ex);
+                    LOGGER.log(Level.SEVERE, "Failed to register for course " + section.courseId(), ex);
                     SwingUtilities.invokeLater(() -> JOptionPane.showMessageDialog(CourseCatalogPanel.this, "Error registering for course: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE));
                 }
                 return null;
             }
             @Override
             protected void done() {
-                JOptionPane.showMessageDialog(CourseCatalogPanel.this, "Successfully registered for " + section.getCourseTitle(), "Success", JOptionPane.INFORMATION_MESSAGE);
+                JOptionPane.showMessageDialog(CourseCatalogPanel.this, "Successfully registered for " + section.courseId(), "Success", JOptionPane.INFORMATION_MESSAGE);
                 loadData();
             }
         };

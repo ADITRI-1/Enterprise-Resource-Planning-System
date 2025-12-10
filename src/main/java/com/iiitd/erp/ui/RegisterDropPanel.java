@@ -1,6 +1,8 @@
 package com.iiitd.erp.ui;
 
-import com.iiitd.erp.io.dto.response.SectionResponse;
+import com.iiitd.erp.io.dto.response.CourseResponse;
+import com.iiitd.erp.io.dto.response.SectionRow;
+import com.iiitd.erp.io.dto.response.StudentResponse;
 import com.iiitd.erp.ui.client.StudentClient;
 
 import javax.swing.*;
@@ -12,15 +14,18 @@ import javax.swing.table.TableRowSorter;
 import java.awt.*;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
+import java.util.function.Function;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
 
 public class RegisterDropPanel extends JPanel {
 
     private final StudentClient student;
     private JTable coursesTable;
     private TableRowSorter<DefaultTableModel> sorter;
-    private List<SectionResponse> sectionList = new ArrayList<>();
+    private List<CourseInfo> courseInfoList = new ArrayList<>();
     private static final Logger LOGGER = Logger.getLogger(RegisterDropPanel.class.getName());
     private final boolean isMaintenanceMode;
 
@@ -43,7 +48,7 @@ public class RegisterDropPanel extends JPanel {
         contentPanel.add(createFilterBar(), BorderLayout.NORTH);
         
         JPanel mainPanel = new JPanel(new BorderLayout());
-        mainPanel.add(createListCoursesPanel(), "list");
+        mainPanel.add(createListCoursesPanel(), BorderLayout.CENTER);
         contentPanel.add(mainPanel, BorderLayout.CENTER);
 
         add(contentPanel, BorderLayout.CENTER);
@@ -122,12 +127,26 @@ public class RegisterDropPanel extends JPanel {
     }
 
     public void loadData() {
-        SwingWorker<List<SectionResponse>, Void> worker = new SwingWorker<>() {
+        SwingWorker<List<CourseInfo>, Void> worker = new SwingWorker<>() {
             @Override
-            protected List<SectionResponse> doInBackground() {
+            protected List<CourseInfo> doInBackground() {
                 try {
                     LOGGER.info("Loading registered courses");
-                    return student.getRegisteredCourses();
+                    StudentResponse me = student.getMyInfo();
+                    String uid = me.rollNo().toString();
+                    List<SectionRow> sections = student.getRegisteredSections(uid);
+                    List<CourseResponse> courses = student.getAvailableCourses();
+                    Map<String, CourseResponse> courseMap = courses.stream()
+                            .collect(Collectors.toMap(CourseResponse::courseId, Function.identity()));
+
+                    List<CourseInfo> infoList = new ArrayList<>();
+                    for (SectionRow section : sections) {
+                        CourseResponse course = courseMap.get(section.courseId());
+                        if (course != null) {
+                            infoList.add(new CourseInfo(section.sectionId(), section.courseId(), course.title(), course.credits(), section.instructorName()));
+                        }
+                    }
+                    return infoList;
                 } catch (Exception e) {
                     LOGGER.log(Level.SEVERE, "Failed to load registered courses", e);
                     return null;
@@ -137,11 +156,11 @@ public class RegisterDropPanel extends JPanel {
             @Override
             protected void done() {
                 try {
-                    sectionList = get();
+                    courseInfoList = get();
                     DefaultTableModel model = (DefaultTableModel) coursesTable.getModel();
                     model.setRowCount(0);
-                    if (sectionList != null) {
-                        sectionList.forEach(s -> model.addRow(new Object[]{s.getCourseId(), s.getCourseTitle(), s.getCredits(), s.getInstructorName()}));
+                    if (courseInfoList != null) {
+                        courseInfoList.forEach(s -> model.addRow(new Object[]{s.courseId(), s.title(), s.credits(), s.instructorName()}));
                     }
                 } catch (Exception e) {
                     LOGGER.log(Level.SEVERE, "Failed to update registered courses table", e);
@@ -158,9 +177,9 @@ public class RegisterDropPanel extends JPanel {
             return;
         }
         int modelRow = coursesTable.convertRowIndexToModel(viewRow);
-        SectionResponse section = sectionList.get(modelRow);
+        CourseInfo section = courseInfoList.get(modelRow);
         
-        if (JOptionPane.showConfirmDialog(this, "Are you sure you want to drop course " + section.getCourseTitle() + "?", "Confirm Drop", JOptionPane.YES_NO_OPTION) != JOptionPane.YES_OPTION) {
+        if (JOptionPane.showConfirmDialog(this, "Are you sure you want to drop course " + section.title() + "?", "Confirm Drop", JOptionPane.YES_NO_OPTION) != JOptionPane.YES_OPTION) {
             return;
         }
 
@@ -168,17 +187,17 @@ public class RegisterDropPanel extends JPanel {
             @Override
             protected Void doInBackground() {
                 try {
-                    LOGGER.info("Dropping course: " + section.getCourseId());
-                    student.dropCourse(section.getSectionId());
+                    LOGGER.info("Dropping course: " + section.courseId());
+                    student.dropCourse(section.sectionId());
                 } catch (Exception ex) {
-                    LOGGER.log(Level.SEVERE, "Failed to drop course " + section.getCourseId(), ex);
+                    LOGGER.log(Level.SEVERE, "Failed to drop course " + section.courseId(), ex);
                     SwingUtilities.invokeLater(() -> JOptionPane.showMessageDialog(RegisterDropPanel.this, "Error dropping course: " + ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE));
                 }
                 return null;
             }
             @Override
             protected void done() {
-                JOptionPane.showMessageDialog(RegisterDropPanel.this, "Successfully dropped " + section.getCourseTitle(), "Success", JOptionPane.INFORMATION_MESSAGE);
+                JOptionPane.showMessageDialog(RegisterDropPanel.this, "Successfully dropped " + section.title(), "Success", JOptionPane.INFORMATION_MESSAGE);
                 loadData();
             }
         };
@@ -200,4 +219,6 @@ public class RegisterDropPanel extends JPanel {
         button.setBorder(new EmptyBorder(8, 20, 8, 20));
         button.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
     }
+
+    private record CourseInfo(String sectionId, String courseId, String title, int credits, String instructorName) {}
 }

@@ -1,17 +1,21 @@
 package com.iiitd.erp.ui;
 
+import com.iiitd.erp.io.dto.response.TimetableSlot;
 import com.iiitd.erp.ui.client.StudentClient;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
+import javax.swing.table.DefaultTableModel;
 import java.awt.*;
+import java.time.LocalDate;
+import java.util.List;
 import java.util.logging.Logger;
 
 public class TimetablePanel extends JPanel {
 
     private final StudentClient student;
     private static final Logger LOGGER = Logger.getLogger(TimetablePanel.class.getName());
-    private final TimetableView timetableView;
+    private final JTable table;
 
     public TimetablePanel(StudentClient student) {
         this.student = student;
@@ -25,8 +29,13 @@ public class TimetablePanel extends JPanel {
         title.setBorder(new EmptyBorder(10, 0, 10, 0));
         add(title, BorderLayout.NORTH);
 
-        timetableView = new TimetableView();
-        add(new JScrollPane(timetableView), BorderLayout.CENTER);
+        DefaultTableModel model = new DefaultTableModel(
+                new Object[]{"Day", "Start", "End", "Course", "Title", "Room"}, 0);
+        table = new JTable(model);
+        table.setRowHeight(28);
+        table.getTableHeader().setFont(new Font("Segoe UI", Font.BOLD, 14));
+        table.setFont(new Font("Segoe UI", Font.PLAIN, 14));
+        add(new JScrollPane(table), BorderLayout.CENTER);
         
         JPanel buttonPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
         JButton refreshButton = new JButton("Refresh");
@@ -38,17 +47,33 @@ public class TimetablePanel extends JPanel {
     }
 
     private void loadTimetable() {
-        SwingWorker<com.iiitd.erp.io.dto.response.Timetable, Void> worker = new SwingWorker<>() {
+        SwingWorker<List<TimetableSlot>, Void> worker = new SwingWorker<>() {
             @Override
-            protected com.iiitd.erp.io.dto.response.Timetable doInBackground() throws Exception {
-                return student.getMyTimetable();
+            protected List<TimetableSlot> doInBackground() throws Exception {
+                LocalDate now = LocalDate.now();
+                String semester = now.getMonthValue() >= 7 ? "Monsoon" : "Winter";
+                int year = now.getYear();
+                return student.getMyTimetable(semester, year);
             }
 
             @Override
             protected void done() {
                 try {
-                    com.iiitd.erp.io.dto.response.Timetable timetable = get();
-                    timetableView.setTimetable(timetable);
+                    List<TimetableSlot> slots = get();
+                    DefaultTableModel model = (DefaultTableModel) table.getModel();
+                    model.setRowCount(0);
+                    if (slots != null) {
+                        for (TimetableSlot slot : slots) {
+                            model.addRow(new Object[]{
+                                    slot.dayOfWeek(),
+                                    slot.startTime(),
+                                    slot.endTime(),
+                                    slot.courseCode(),
+                                    slot.courseTitle(),
+                                    slot.room()
+                            });
+                        }
+                    }
                 } catch (Exception e) {
                     LOGGER.severe("Failed to load timetable: " + e.getMessage());
                 }

@@ -71,6 +71,8 @@ public class TimetableFilterPanel extends JPanel {
         panel.add(comboBox, gbc);
     }
     
+    public void loadFilters() { loadDropdowns(); }
+
     private void loadDropdowns() {
         loadCourses();
         loadSections();

@@ -1,6 +1,6 @@
 package com.iiitd.erp.ui;
 
-import com.iiitd.erp.io.dto.response.AssessmentResponse;
+import com.iiitd.erp.io.dto.response.AssessmentComponentResponse;
 import com.iiitd.erp.ui.client.InstructorClient;
 
 import javax.swing.*;
@@ -17,9 +17,9 @@ public class AssessmentsPanel extends JPanel {
     private JTable assessmentsTable;
     private static final Logger LOGGER = Logger.getLogger(AssessmentsPanel.class.getName());
     private final boolean isMaintenanceMode;
-    private final int sectionId;
+    private String sectionId;
 
-    public AssessmentsPanel(InstructorClient client, boolean maintenanceMode, int sectionId) {
+    public AssessmentsPanel(InstructorClient client, boolean maintenanceMode, String sectionId) {
         this.client = client;
         this.isMaintenanceMode = maintenanceMode;
         this.sectionId = sectionId;
@@ -44,6 +44,13 @@ public class AssessmentsPanel extends JPanel {
         contentPanel.add(createButtonPanel(), BorderLayout.SOUTH);
         add(contentPanel, BorderLayout.CENTER);
 
+        loadData();
+    }
+
+    public void setSectionId(String sectionId) {
+        this.sectionId = sectionId;
+        JLabel title = (JLabel) getComponent(0);
+        title.setText("Manage Assessments for Section " + sectionId);
         loadData();
     }
 
@@ -95,9 +102,12 @@ public class AssessmentsPanel extends JPanel {
     }
 
     public void loadData() {
-        SwingWorker<List<AssessmentResponse>, Void> worker = new SwingWorker<>() {
+        if (sectionId == null || sectionId.isEmpty()) {
+            return;
+        }
+        SwingWorker<List<AssessmentComponentResponse>, Void> worker = new SwingWorker<>() {
             @Override
-            protected List<AssessmentResponse> doInBackground() {
+            protected List<AssessmentComponentResponse> doInBackground() {
                 try {
                     LOGGER.info("Loading assessments for section " + sectionId);
                     return client.getAssessments(sectionId);
@@ -110,11 +120,11 @@ public class AssessmentsPanel extends JPanel {
             @Override
             protected void done() {
                 try {
-                    List<AssessmentResponse> assessmentList = get();
+                    List<AssessmentComponentResponse> assessmentList = get();
                     DefaultTableModel model = (DefaultTableModel) assessmentsTable.getModel();
                     model.setRowCount(0);
                     if (assessmentList != null) {
-                        assessmentList.forEach(a -> model.addRow(new Object[]{a.getComponent(), a.getWeightage()}));
+                        assessmentList.forEach(a -> model.addRow(new Object[]{a.name(), a.weight()}));
                     }
                 } catch (Exception e) {
                     LOGGER.log(Level.SEVERE, "Failed to update assessments table", e);

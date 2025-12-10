@@ -72,8 +72,12 @@ public class InstructorDashboard extends JFrame {
         mainContentPanel.setOpaque(false);
 
         panels.put("Dashboard", new DashboardPanel());
-        panels.put("My Sections", new MySectionsPanel(client, isMaintenanceMode, () -> showView("Assessments")));
-        panels.put("Assessments", new AssessmentsPanel(client, isMaintenanceMode, 1)); // Assuming a default sectionId
+        panels.put("My Sections", new MySectionsPanel(client));
+        panels.put("My Timetable", new InstructorTimetablePanel(client));
+        panels.put("Enter Scores", new EnterScoresPanel(client, isMaintenanceMode));
+        panels.put("Compute Grades", new ComputeGradesPanel(client, isMaintenanceMode));
+        panels.put("View Analytics", new ViewAnalyticsPanel(client));
+
 
         for (Map.Entry<String, JPanel> entry : panels.entrySet()) {
             mainContentPanel.add(entry.getValue(), entry.getKey());
@@ -90,8 +94,8 @@ public class InstructorDashboard extends JFrame {
         JPanel panel = panels.get(viewName);
         if (panel instanceof MySectionsPanel) {
             ((MySectionsPanel) panel).loadData();
-        } else if (panel instanceof AssessmentsPanel) {
-            ((AssessmentsPanel) panel).loadData();
+        } else if (panel instanceof InstructorTimetablePanel) {
+            ((InstructorTimetablePanel) panel).loadTimetable();
         }
 
         cardLayout.show(mainContentPanel, viewName);
@@ -111,7 +115,16 @@ public class InstructorDashboard extends JFrame {
             add(createDashboardCard("My Sections", "View and manage your course sections", () -> showView("My Sections")), gbc);
 
             gbc.gridx = 1; gbc.gridy = 0;
-            add(createDashboardCard("Assessments", "Define assessments and enter scores", () -> showView("Assessments")), gbc);
+            add(createDashboardCard("My Timetable", "View your weekly schedule", () -> showView("My Timetable")), gbc);
+
+            gbc.gridx = 0; gbc.gridy = 1;
+            add(createDashboardCard("Enter Scores", "Enter scores for assessments", () -> showView("Enter Scores")), gbc);
+
+            gbc.gridx = 1; gbc.gridy = 1;
+            add(createDashboardCard("Compute Grades", "Compute final grades for your sections", () -> showView("Compute Grades")), gbc);
+            
+            gbc.gridx = 0; gbc.gridy = 2;
+            add(createDashboardCard("View Analytics", "View analytics for your sections", () -> showView("View Analytics")), gbc);
         }
 
         private JPanel createDashboardCard(String title, String subtitle, Runnable action) {
@@ -171,8 +184,8 @@ public class InstructorDashboard extends JFrame {
             navPanel.setOpaque(false);
             navPanel.setLayout(new BoxLayout(navPanel, BoxLayout.Y_AXIS));
 
-            String[] navItems = {"Dashboard", "My Sections", "Assessments"};
-            char[] icons = {'\uE80F', '\uE7BE', '\uE716'};
+            String[] navItems = {"Dashboard", "My Sections", "My Timetable", "Enter Scores", "Compute Grades", "View Analytics"};
+            char[] icons = {'\uE80F', '\uE7BE', '\uE787', '\uE716', '\uE716', '\uE716'};
 
             for (int i = 0; i < navItems.length; i++) {
                 String item = navItems[i];

@@ -1,13 +1,10 @@
 package com.iiitd.erp.ui;
 
-import com.iiitd.erp.ui.client.AuthClient;
 import com.iiitd.erp.ui.client.AdminClient;
-import com.iiitd.erp.ui.client.AuthClient.LoginResult;
+import com.iiitd.erp.ui.client.AuthClient;
 import com.iiitd.erp.ui.client.InstructorClient;
 import com.iiitd.erp.ui.client.StudentClient;
-import com.iiitd.erp.ui.AdminDashboardExact;
-import com.iiitd.erp.ui.InstructorDashboardWindow;
-import com.iiitd.erp.ui.StudentDashboard;
+
 
 import javax.swing.*;
 import java.awt.*;
@@ -184,7 +181,7 @@ public class LoginUI extends JFrame {
         SwingWorker<Void, Void> worker = new SwingWorker<>() {
             @Override protected Void doInBackground() {
                 try {
-                    LoginResult result = authClient.login(user, pass, role);
+                    AuthClient.LoginResult result = authClient.login(user, pass, role);
                     if (result.success()) {
                         LOGGER.info("Login successful for user: " + user);
                         JOptionPane.showMessageDialog(LoginUI.this,
@@ -210,7 +207,7 @@ public class LoginUI extends JFrame {
         worker.execute();
     }
 
-    private void openDashboard(LoginResult result) {
+    private void openDashboard(AuthClient.LoginResult result) {
         LOGGER.info("Opening " + result.role() + " dashboard for user: " + result.cookieHeader());
         switch (result.role().toUpperCase()) {
             case "STUDENT" -> SwingUtilities.invokeLater(() -> {
@@ -219,7 +216,7 @@ public class LoginUI extends JFrame {
             });
             case "INSTRUCTOR" -> SwingUtilities.invokeLater(() -> {
                 instructorClient.setCookieHeader(result.cookieHeader());
-                new InstructorDashboardWindow(instructorClient, result.maintenanceMode()).setVisible(true);
+                new InstructorDashboard(instructorClient, result.maintenanceMode()).setVisible(true);
             });
             case "ADMIN" -> SwingUtilities.invokeLater(() -> {
                 AdminClient admin = new AdminClient(baseUrl, result.cookieHeader());

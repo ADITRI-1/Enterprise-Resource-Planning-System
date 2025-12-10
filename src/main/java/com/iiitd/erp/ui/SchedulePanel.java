@@ -1,13 +1,14 @@
 package com.iiitd.erp.ui;
 
-import com.iiitd.erp.io.dto.response.*;
+import com.iiitd.erp.io.dto.response.InstructorResponse;
+import com.iiitd.erp.io.dto.response.RoomResponse;
+import com.iiitd.erp.io.dto.response.SectionResponse;
 import com.iiitd.erp.ui.client.AdminClient;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
-import java.util.List;
-import java.util.logging.Level;
+import java.time.LocalDate;
 import java.util.logging.Logger;
 
 public class SchedulePanel extends JPanel {
@@ -16,32 +17,72 @@ public class SchedulePanel extends JPanel {
     private final boolean isMaintenanceMode;
     private static final Logger LOGGER = Logger.getLogger(SchedulePanel.class.getName());
     private TimetableView timetablePanel;
+    private TimetableFilterPanel filterPanel;
+    private JComboBox<String> semesterComboBox;
+    private JComboBox<Integer> yearComboBox;
 
-    public SchedulePanel(AdminClient admin, boolean maintenanceMode) {
+    public SchedulePanel(AdminClient admin, boolean isMaintenanceMode) {
         this.admin = admin;
-        this.isMaintenanceMode = maintenanceMode;
+        this.isMaintenanceMode = isMaintenanceMode;
         setOpaque(false);
-        setLayout(new BorderLayout(20, 20));
-        setBorder(new EmptyBorder(10, 20, 10, 20));
+        setLayout(new BorderLayout(20, 10));
+        setBorder(new EmptyBorder(10, 20, 20, 20));
 
-        TimetableFilterPanel filterPanel = new TimetableFilterPanel(admin);
-        timetablePanel = new TimetableView(admin, isMaintenanceMode, this::refreshData);
+        add(createTermSelector(), BorderLayout.NORTH);
+        add(createTabbedPane(), BorderLayout.CENTER);
+    }
+
+    private JComponent createTermSelector() {
+        JPanel termPanel = new JPanel(new FlowLayout(FlowLayout.LEFT, 15, 5));
+        termPanel.setOpaque(false);
+
+        termPanel.add(new JLabel("Semester:"));
+        semesterComboBox = new JComboBox<>(new String[]{"Monsoon", "Winter"});
+        termPanel.add(semesterComboBox);
+
+        termPanel.add(new JLabel("Year:"));
+        yearComboBox = new JComboBox<>(getYearList());
+        termPanel.add(yearComboBox);
+
+        // Set default to current term
+        LocalDate now = LocalDate.now();
+        semesterComboBox.setSelectedItem(now.getMonthValue() >= 7 ? "Monsoon" : "Winter");
+        yearComboBox.setSelectedItem(now.getYear());
+
+        // Add listeners to refresh data on term change
+        semesterComboBox.addActionListener(e -> onTermChange());
+        yearComboBox.addActionListener(e -> onTermChange());
+
+        return termPanel;
+    }
+
+    private JTabbedPane createTabbedPane() {
+        JTabbedPane tabbedPane = new JTabbedPane();
+        tabbedPane.setFont(new Font("Segoe UI", Font.PLAIN, 16));
+
+        // Section Builder Tab
+        this.filterPanel = new TimetableFilterPanel(admin);
+        this.timetablePanel = new TimetableView(admin, isMaintenanceMode, this::refreshData);
+        filterPanel.setSelectionListener(this::showTimetableFor);
+
+        JPanel builderPanel = new JPanel(new BorderLayout(15, 0));
+        builderPanel.setOpaque(false);
+        builderPanel.add(filterPanel, BorderLayout.WEST);
+        builderPanel.add(timetablePanel, BorderLayout.CENTER);
         
-        filterPanel.setSelectionListener(e -> {
-            JComboBox<?> source = (JComboBox<?>) e.getSource();
-            Object selected = source.getSelectedItem();
-            if (selected instanceof CourseResponse) {
-                // In a future enhancement, this could filter the sections dropdown
-            } else {
-                showTimetableFor(selected);
-            }
-        });
+        // Global Search Tab
+        TimetableSearchPanel searchPanel = new TimetableSearchPanel(admin, timetablePanel);
+        
+        tabbedPane.addTab("Section Builder", builderPanel);
+        tabbedPane.addTab("Global Search", searchPanel);
+        
+        return tabbedPane;
+    }
 
-        JSplitPane splitPane = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT, filterPanel, timetablePanel);
-        splitPane.setDividerLocation(300);
-        splitPane.setOpaque(false);
-        splitPane.setBorder(null);
-        add(splitPane, BorderLayout.CENTER);
+    private void onTermChange() {
+        LOGGER.info("Term changed to: " + getSemester() + " " + getYear());
+        filterPanel.loadFilters();
+        timetablePanel.clearScheduleView();
     }
 
     private void showTimetableFor(Object selection) {
@@ -69,7 +110,25 @@ public class SchedulePanel extends JPanel {
         timetablePanel.setView(viewType, id, section);
     }
 
+    private Integer[] getYearList() {
+        int currentYear = LocalDate.now().getYear();
+        Integer[] years = new Integer[5];
+        for (int i = 0; i < 5; i++) {
+            years[i] = currentYear - 2 + i;
+        }
+        return years;
+    }
+
+    public String getSemester() {
+        return (String) semesterComboBox.getSelectedItem();
+    }
+
+    public int getYear() {
+        return (int) yearComboBox.getSelectedItem();
+    }
+
     public void refreshData() {
-        // This can be called to refresh all data in the panel if needed
+        filterPanel.loadFilters();
+        timetablePanel.clearScheduleView();
     }
 }

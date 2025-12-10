@@ -1,12 +1,13 @@
 package com.iiitd.erp.ui;
 
-import com.iiitd.erp.io.dto.response.GradeResponse;
+import com.iiitd.erp.io.dto.response.Grade;
 import com.iiitd.erp.ui.client.StudentClient;
 
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
+import javax.swing.RowFilter;
 import javax.swing.table.DefaultTableModel;
 import javax.swing.table.TableRowSorter;
 import java.awt.*;
@@ -23,7 +24,7 @@ public class GradesPanel extends JPanel {
     private JTable gradesTable;
     private TableRowSorter<DefaultTableModel> sorter;
     private static final Logger LOGGER = Logger.getLogger(GradesPanel.class.getName());
-    private List<GradeResponse> gradeList;
+    private List<Grade> gradeList;
 
     public GradesPanel(StudentClient student) {
         this.student = student;
@@ -42,7 +43,8 @@ public class GradesPanel extends JPanel {
         
         contentPanel.add(createFilterBar(), BorderLayout.NORTH);
 
-        DefaultTableModel model = new DefaultTableModel(new Object[]{"Course", "Component", "Weightage", "Score", "Final Grade"}, 0);
+        DefaultTableModel model = new DefaultTableModel(
+                new Object[]{"Course Code", "Title", "Credits", "Grade", "SGPA Impact"}, 0);
         gradesTable = new JTable(model);
         sorter = new TableRowSorter<>(model);
         gradesTable.setRowSorter(sorter);
@@ -102,9 +104,9 @@ public class GradesPanel extends JPanel {
     }
 
     private void loadGrades() {
-        SwingWorker<List<GradeResponse>, Void> worker = new SwingWorker<>() {
+        SwingWorker<List<Grade>, Void> worker = new SwingWorker<>() {
             @Override
-            protected List<GradeResponse> doInBackground() throws Exception {
+            protected List<Grade> doInBackground() throws Exception {
                 return student.getMyGrades();
             }
 
@@ -114,8 +116,14 @@ public class GradesPanel extends JPanel {
                     gradeList = get();
                     DefaultTableModel model = (DefaultTableModel) gradesTable.getModel();
                     model.setRowCount(0);
-                    for (GradeResponse grade : gradeList) {
-                        model.addRow(new Object[]{grade.getCourseName(), grade.getComponent(), grade.getWeightage(), grade.getScore(), grade.getFinalGrade()});
+                    for (Grade grade : gradeList) {
+                        model.addRow(new Object[]{
+                                grade.getCourseCode(),
+                                grade.getCourseTitle(),
+                                grade.getCredits(),
+                                grade.getGrade(),
+                                grade.getSgpaImpact()
+                        });
                     }
                 } catch (Exception e) {
                     LOGGER.log(Level.SEVERE, "Failed to load grades", e);
@@ -139,7 +147,7 @@ public class GradesPanel extends JPanel {
                         writer.append(',');
                     }
                 }
-                writer.append('\\n');
+                writer.append("\n");
 
                 for (int i = 0; i < gradesTable.getRowCount(); i++) {
                     for (int j = 0; j < gradesTable.getColumnCount(); j++) {
@@ -148,7 +156,7 @@ public class GradesPanel extends JPanel {
                             writer.append(',');
                         }
                     }
-                    writer.append('\\n');
+                    writer.append("\n");
                 }
                 JOptionPane.showMessageDialog(this, "CSV file exported successfully.", "Export Successful", JOptionPane.INFORMATION_MESSAGE);
             } catch (IOException e) {

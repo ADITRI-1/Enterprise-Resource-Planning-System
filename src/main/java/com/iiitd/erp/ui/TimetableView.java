@@ -162,6 +162,7 @@ public class TimetableView extends JPanel {
                 switch (viewType) {
                     case "Section":
                         schedule = admin.viewScheduleForSection(viewId);
+                        if (schedule == null || schedule.slots() == null) return new ArrayList<>();
                         return schedule.slots().stream()
                                 .map(s -> new TimetableSearchSlotResponse(
                                         viewId,
@@ -176,6 +177,7 @@ public class TimetableView extends JPanel {
                                 .collect(Collectors.toList());
                     case "Room":
                         schedule = admin.viewScheduleForRoom(viewId);
+                        if (schedule == null || schedule.slots() == null) return new ArrayList<>();
                          return schedule.slots().stream()
                                 .map(s -> new TimetableSearchSlotResponse(
                                         null,
@@ -190,6 +192,7 @@ public class TimetableView extends JPanel {
                                 .collect(Collectors.toList());
                     case "Instructor":
                         schedule = admin.viewScheduleForInstructor(viewId);
+                        if (schedule == null || schedule.slots() == null) return new ArrayList<>();
                          return schedule.slots().stream()
                                 .map(s -> new TimetableSearchSlotResponse(
                                         null,
@@ -227,8 +230,11 @@ public class TimetableView extends JPanel {
     private void updateGrid() {
         Component[] components = gridPanel.getComponents();
         for (Component component : components) {
-            if (component instanceof JPanel) {
-                gridPanel.remove(component);
+            if (component instanceof JComponent jc) {
+                Object tag = jc.getClientProperty("schedulePill");
+                if ("pill".equals(tag)) {
+                    gridPanel.remove(component);
+                }
             }
         }
 
@@ -253,18 +259,20 @@ public class TimetableView extends JPanel {
 
     private JPanel createSchedulePill(TimetableSearchSlotResponse slot) {
         JPanel pill = new JPanel(new BorderLayout(5, 2));
-        pill.setBackground(getCourseColor(slot.courseId()));
+        String courseText = slot.courseId() != null ? slot.courseId() : "N/A";
+        pill.setBackground(getCourseColor(courseText));
         pill.setBorder(BorderFactory.createCompoundBorder(
             BorderFactory.createLineBorder(Color.WHITE, 2),
             new EmptyBorder(5, 5, 5, 5)
         ));
+        pill.putClientProperty("schedulePill", "pill");
         
-        JLabel courseLabel = new JLabel(slot.courseId(), SwingConstants.CENTER);
+        JLabel courseLabel = new JLabel(courseText, SwingConstants.CENTER);
         courseLabel.setForeground(Color.WHITE);
         courseLabel.setFont(new Font("Segoe UI", Font.BOLD, 14));
         
-        String roomText = slot.roomId();
-        if(roomCache.containsKey(slot.roomId())){
+        String roomText = slot.roomId() != null ? slot.roomId() : "N/A";
+        if (slot.roomId() != null && roomCache.containsKey(slot.roomId())) {
             roomText = roomCache.get(slot.roomId()).roomId();
         }
         JLabel roomLabel = new JLabel(roomText, SwingConstants.CENTER);
@@ -277,10 +285,14 @@ public class TimetableView extends JPanel {
     }
 
     private Color getCourseColor(String courseId) {
-        return courseColorMap.computeIfAbsent(courseId, c -> pillColors[courseColorMap.size() % pillColors.length]);
+        String key = courseId == null ? "UNKNOWN" : courseId;
+        return courseColorMap.computeIfAbsent(key, c -> pillColors[courseColorMap.size() % pillColors.length]);
     }
 
     private void openScheduleDialog() {
+        if (currentSection == null || !"Section".equals(viewType)) {
+            return;
+        }
         ScheduleSlotDialog dialog = new ScheduleSlotDialog((Frame) SwingUtilities.getWindowAncestor(this), admin, currentSection.capacity(), currentSection.instructorCode(), currentSection.year(), currentSection.semester());
         dialog.setVisible(true);
         RoomAvailabilityResponse selectedRoom = dialog.getSelectedRoom();
@@ -296,6 +308,9 @@ public class TimetableView extends JPanel {
     }
 
     private void saveSchedule() {
+        if (!"Section".equals(viewType) || currentSection == null) {
+            return;
+        }
         List<ScheduleSlotRequest> slotsToSave = scheduleSlots.stream()
             .map(s -> new ScheduleSlotRequest(s.day(), s.startTime(), s.endTime(), s.roomId()))
             .collect(Collectors.toList());
@@ -321,6 +336,9 @@ public class TimetableView extends JPanel {
     }
 
     private void clearScheduleAction() {
+        if (!"Section".equals(viewType)) {
+            return;
+        }
         if (JOptionPane.showConfirmDialog(this, "Are you sure you want to clear the entire schedule for this section?", "Confirm Clear", JOptionPane.YES_NO_OPTION) != JOptionPane.YES_OPTION) {
             return;
         }

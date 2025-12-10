@@ -10,6 +10,7 @@ import java.awt.*;
 import java.util.List;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import java.util.stream.Collectors;
 
 public class InstructorCourseSectionsWindow extends JFrame {
 
@@ -58,25 +59,29 @@ public class InstructorCourseSectionsWindow extends JFrame {
     }
 
     private void loadCourses() {
-        SwingWorker<Void, Void> w = new SwingWorker<>() {
-            List<CourseResponse> courses;
-            @Override protected Void doInBackground() {
+        SwingWorker<List<CourseResponse>, Void> w = new SwingWorker<>() {
+            @Override protected List<CourseResponse> doInBackground() {
                 try {
                     LOGGER.info("Loading instructor courses");
-                    courses = client.getMyCourses();
+                    return client.getMyCourses();
                 } catch (Exception e) {
                     LOGGER.log(Level.SEVERE, "Failed to load instructor courses", e);
                     JOptionPane.showMessageDialog(InstructorCourseSectionsWindow.this, "Error loading courses: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+                    return null;
                 }
-                return null;
             }
             @Override protected void done() {
-                DefaultTableModel m = (DefaultTableModel) courseTable.getModel();
-                m.setRowCount(0);
-                if (courses != null) {
-                    for (CourseResponse course : courses) {
-                        m.addRow(new Object[]{course.courseId(), course.title()});
+                try {
+                    List<CourseResponse> courses = get();
+                    DefaultTableModel m = (DefaultTableModel) courseTable.getModel();
+                    m.setRowCount(0);
+                    if (courses != null) {
+                        for (CourseResponse course : courses) {
+                            m.addRow(new Object[]{course.courseId(), course.title()});
+                        }
                     }
+                } catch (Exception e) {
+                    LOGGER.log(Level.SEVERE, "Failed to update course table", e);
                 }
             }
         };
@@ -84,25 +89,32 @@ public class InstructorCourseSectionsWindow extends JFrame {
     }
 
     private void loadSections(String courseId) {
-        SwingWorker<Void, Void> w = new SwingWorker<>() {
-            List<SectionResponse> sections;
-            @Override protected Void doInBackground() {
+        SwingWorker<List<SectionResponse>, Void> w = new SwingWorker<>() {
+            @Override protected List<SectionResponse> doInBackground() {
                 try {
                     LOGGER.info("Loading sections for course: " + courseId);
-                    sections = client.getMySections(courseId);
+                    return client.getMySections();
                 } catch (Exception e) {
                     LOGGER.log(Level.SEVERE, "Failed to load sections for course " + courseId, e);
                     JOptionPane.showMessageDialog(InstructorCourseSectionsWindow.this, "Error loading sections: " + e.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+                    return null;
                 }
-                return null;
             }
             @Override protected void done() {
-                DefaultTableModel m = (DefaultTableModel) sectionTable.getModel();
-                m.setRowCount(0);
-                if (sections != null) {
-                    for (SectionResponse section : sections) {
-                        m.addRow(new Object[]{section.sectionId(), section.semester(), section.year(), section.capacity()});
+                try {
+                    List<SectionResponse> sections = get();
+                    DefaultTableModel m = (DefaultTableModel) sectionTable.getModel();
+                    m.setRowCount(0);
+                    if (sections != null) {
+                        List<SectionResponse> filteredSections = sections.stream()
+                                .filter(s -> s.courseId().equals(courseId))
+                                .collect(Collectors.toList());
+                        for (SectionResponse section : filteredSections) {
+                            m.addRow(new Object[]{section.sectionId(), section.semester(), section.year(), section.capacity()});
+                        }
                     }
+                } catch (Exception e) {
+                    LOGGER.log(Level.SEVERE, "Failed to update section table", e);
                 }
             }
         };
