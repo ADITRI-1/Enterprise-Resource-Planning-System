@@ -82,12 +82,11 @@ public class CreateInstructorPanel extends JPanel {
         GridBagConstraints mainGbc = new GridBagConstraints();
         add(formContainer, mainGbc);
 
-        loadDepartments();
-
         this.addComponentListener(new ComponentAdapter() {
             @Override
             public void componentShown(ComponentEvent e) {
                 resetForm();
+                loadDepartments();
             }
         });
     }

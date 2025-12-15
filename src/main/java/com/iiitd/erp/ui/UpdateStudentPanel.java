@@ -8,6 +8,8 @@ import com.iiitd.erp.ui.client.AdminClient;
 import javax.swing.*;
 import javax.swing.border.EmptyBorder;
 import java.awt.*;
+import java.awt.event.ComponentAdapter;
+import java.awt.event.ComponentEvent;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
@@ -100,7 +102,12 @@ public class UpdateStudentPanel extends JPanel {
         mainGbc.anchor = GridBagConstraints.CENTER;
         add(formContainer, mainGbc);
 
-        loadPrograms();
+        this.addComponentListener(new ComponentAdapter() {
+            @Override
+            public void componentShown(ComponentEvent e) {
+                loadPrograms();
+            }
+        });
     }
     
     private void setupDobField(JPanel panel, GridBagConstraints gbc, int y) {

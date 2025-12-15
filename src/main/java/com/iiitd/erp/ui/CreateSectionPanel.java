@@ -88,12 +88,11 @@ public class CreateSectionPanel extends JPanel {
         GridBagConstraints mainGbc = new GridBagConstraints();
         add(formContainer, mainGbc);
 
-        loadDropdownData();
-
         this.addComponentListener(new ComponentAdapter() {
             @Override
             public void componentShown(ComponentEvent e) {
                 resetForm();
+                loadDropdownData();
             }
         });
     }

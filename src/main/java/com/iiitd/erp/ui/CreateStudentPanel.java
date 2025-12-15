@@ -22,11 +22,11 @@ public class CreateStudentPanel extends JPanel {
     private final Runnable onBack;
     private static final Logger LOGGER = Logger.getLogger(CreateStudentPanel.class.getName());
 
-    private final IconTextField rollNoField = new IconTextField();
-    private final IconTextField nameField = new IconTextField();
+    private final JTextField rollNoField = new JTextField(20);
+    private final JTextField nameField = new JTextField(20);
     private final JComboBox<ProgramResponse> programIdField = new JComboBox<>();
     private final JTextField yearField = new JTextField(Year.now().toString());
-    private final IconTextField dobField = new IconTextField();
+    private final JTextField dobField = new JTextField(20);
 
     public CreateStudentPanel(AdminClient admin, Runnable onBack) {
         this.admin = admin;
@@ -39,7 +39,10 @@ public class CreateStudentPanel extends JPanel {
         JPanel formContainer = new JPanel(new BorderLayout(0, 20));
         formContainer.setOpaque(true);
         formContainer.setBackground(Color.WHITE);
-        formContainer.setBorder(new DropShadowBorder());
+        formContainer.setBorder(BorderFactory.createCompoundBorder(
+                BorderFactory.createLineBorder(new Color(220, 225, 235), 1, true),
+                new EmptyBorder(40, 50, 40, 50)
+        ));
 
         JLabel title = new JLabel("Create New Student", SwingConstants.CENTER);
         title.setFont(new Font("Segoe UI", Font.BOLD, 32));
@@ -51,13 +54,6 @@ public class CreateStudentPanel extends JPanel {
         GridBagConstraints gbc = new GridBagConstraints();
         gbc.insets = new Insets(12, 10, 12, 10);
         gbc.anchor = GridBagConstraints.WEST;
-
-        // Set icons for text fields
-        // Note: You would need to have these icons in your project resources
-        // For now, I'll use placeholder characters.
-        // rollNoField.setIcon(new ImageIcon(getClass().getResource("/icons/id.png")));
-        // nameField.setIcon(new ImageIcon(getClass().getResource("/icons/user.png")));
-        // dobField.setIcon(new ImageIcon(getClass().getResource("/icons/calendar.png")));
 
 
         addField(formPanel, gbc, 0, "Roll Number:", rollNoField);
@@ -89,13 +85,12 @@ public class CreateStudentPanel extends JPanel {
 
         GridBagConstraints mainGbc = new GridBagConstraints();
         add(formContainer, mainGbc);
-        
-        loadPrograms();
 
         this.addComponentListener(new ComponentAdapter() {
             @Override
             public void componentShown(ComponentEvent e) {
                 resetForm();
+                loadPrograms();
             }
         });
     }
