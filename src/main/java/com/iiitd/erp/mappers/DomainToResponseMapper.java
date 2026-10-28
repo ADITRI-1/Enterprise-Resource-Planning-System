@@ -30,6 +30,7 @@ public interface DomainToResponseMapper {
     @Mapping(target = "active", expression = "java(Boolean.TRUE.equals(sectionDomain.getActive()))")
     SectionResponse sectionDomainToResponse(SectionDomain sectionDomain);
 
+    @Mapping(source = "dayOfWeek", target = "day")
     ScheduleSlotResponse classScheduleDomainToScheduleSlotResponse(ClassScheduleDomain classScheduleDomain);
 
     AssessmentComponentResponse assessmentComponentDomainToResponse(AssessmentComponentDomain domain);

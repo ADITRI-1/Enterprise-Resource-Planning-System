@@ -19,13 +19,15 @@ public final class ApiResponseSupport {
 
     public static ResponseEntity<ApiErrorResponse> from(ErpException ex) {
         return ResponseEntity.status(resolveStatus(ex.getErrorCode()))
-                .body(ApiErrorResponse.of(ex.getErrorCode(), ex.getMessage()));
+                .body(ApiErrorResponse.of(ex.getErrorCode(), ex.getMessage(), ex.getContext()));
     }
 
     public static HttpStatus resolveStatus(ErrorCode code) {
         return switch (code) {
-            case DUPLICATE_STUDENT, SECTION_DUPLICATE, SCHEDULE_ROOM_CONFLICT, SCHEDULE_INSTRUCTOR_CONFLICT -> HttpStatus.CONFLICT;
-            case ADMIN_FORBIDDEN, INSTRUCTOR_FORBIDDEN -> HttpStatus.FORBIDDEN;
+            case DUPLICATE_STUDENT, SECTION_DUPLICATE, SCHEDULE_ROOM_CONFLICT, SCHEDULE_INSTRUCTOR_CONFLICT,
+                 SECTION_FULL, ALREADY_ENROLLED -> HttpStatus.CONFLICT;
+            case ADMIN_FORBIDDEN, INSTRUCTOR_FORBIDDEN, STUDENT_FORBIDDEN,
+                 SECTION_NOT_OWNED_BY_INSTRUCTOR -> HttpStatus.FORBIDDEN;
             case AUTH_NOT_AUTHENTICATED, AUTHENTICATION_FAILED -> HttpStatus.UNAUTHORIZED;
             case STUDENT_REGISTRATION_BLOCKED,
                  MAINTENANCE_STATUS_FETCH_FAILED,
@@ -33,9 +35,13 @@ public final class ApiResponseSupport {
                  MAINTENANCE_WRITE_BLOCKED -> HttpStatus.SERVICE_UNAVAILABLE;
             case STUDENT_REGISTRATION_FAILED, STUDENT_DROP_FAILED, SECTION_ID_IMMUTABLE,
                  SECTION_INVALID_SEMESTER, SCHEDULE_OUTSIDE_WORKING_HOURS, SCHEDULE_ROOM_CAPACITY_MISMATCH,
-                 SCHEDULE_SLOT_INVALID, ASSESSMENT_SCORE_INVALID, STUDENT_NOT_IN_SECTION -> HttpStatus.BAD_REQUEST;
-            case SECTION_NOT_FOUND -> HttpStatus.NOT_FOUND;
-            default -> HttpStatus.INTERNAL_SERVER_ERROR;
+                 SCHEDULE_SLOT_INVALID, ASSESSMENT_SCORE_INVALID, STUDENT_NOT_IN_SECTION,
+                 REGISTRATION_DEADLINE_PASSED, DROP_DEADLINE_PASSED, SECTION_INACTIVE,
+                 ASSESSMENT_WEIGHT_EXCEEDED, ASSESSMENT_WEIGHTS_INCOMPLETE, ASSESSMENT_SCORE_IMPORT_FAILED,
+                 REQUEST_VALIDATION_FAILED -> HttpStatus.BAD_REQUEST;
+            case PROGRAM_DUPLICATE, DEPARTMENT_DUPLICATE, COURSE_DUPLICATE, ROOM_DUPLICATE,
+                 INSTRUCTOR_DUPLICATE -> HttpStatus.CONFLICT;
+            default -> code.name().endsWith("_NOT_FOUND") ? HttpStatus.NOT_FOUND : HttpStatus.INTERNAL_SERVER_ERROR;
         };
     }
 }

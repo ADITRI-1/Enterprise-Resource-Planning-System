@@ -6,6 +6,8 @@ import java.util.List;
 
 public interface SectionPersistPort {
     SectionDomain findBySectionId(String sectionId);
+    // Row-locks the section until the surrounding transaction ends (null if missing).
+    SectionDomain lockForUpdate(String sectionId);
     SectionDomain save(SectionDomain sectionDomain);
     SectionDomain update(SectionDomain sectionDomain);
     boolean delete(String sectionId);

@@ -3,30 +3,31 @@ package com.iiitd.erp.io.controller;
 import com.iiitd.erp.Domain.RegistrationOutcomeDomain;
 import com.iiitd.erp.Domain.StudentGradeDomain;
 import com.iiitd.erp.Domain.StudentTimeTableSlotDomain;
-import com.iiitd.erp.core.service.CatalogService;
+import com.iiitd.erp.Domain.StudentUserDomain;
 import com.iiitd.erp.core.service.MaintenanceService;
 import com.iiitd.erp.core.service.SectionService;
+import com.iiitd.erp.core.service.StudentService;
 import com.iiitd.erp.exception.ErrorCode;
 import com.iiitd.erp.exception.ErpException;
+import com.iiitd.erp.io.controller.support.CurrentUser;
 import com.iiitd.erp.io.dto.request.DropRequest;
 import com.iiitd.erp.io.dto.request.RegisterRequest;
 import com.iiitd.erp.io.dto.response.GradeRow;
+import com.iiitd.erp.io.dto.response.StudentProfileResponse;
 import com.iiitd.erp.io.dto.response.TimetableSlot;
 import com.iiitd.erp.mappers.DomainToResponseMapper;
+import com.iiitd.erp.persistent.entity.auth_db.UserAuth;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.core.io.FileSystemResource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
-import java.nio.file.Path;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static com.iiitd.erp.io.controller.support.ApiResponseSupport.error;
 import static com.iiitd.erp.io.controller.support.ApiResponseSupport.from;
@@ -39,25 +40,42 @@ public class StudentController {
 
     private final SectionService sections;
     private final MaintenanceService maintenance;
-    private final CatalogService catalog;
+    private final StudentService students;
+    private final CurrentUser currentUser;
     private final DomainToResponseMapper mapper = DomainToResponseMapper.DOMAIN_TO_RESPONSE_MAPPER_INSTANCE;
 
     public StudentController(SectionService sections,
                              MaintenanceService maintenance,
-                             CatalogService catalog) {
+                             StudentService students,
+                             CurrentUser currentUser) {
         this.sections = sections;
         this.maintenance = maintenance;
-        this.catalog = catalog;
+        this.students = students;
+        this.currentUser = currentUser;
     }
 
-    // Catalog endpoints can be added here as before if needed.
+    @GetMapping("/me")
+    public ResponseEntity<?> me() {
+        Optional<UserAuth> account = currentUser.student();
+        if (account.isEmpty()) {
+            return error(HttpStatus.FORBIDDEN, ErrorCode.STUDENT_FORBIDDEN);
+        }
+        try {
+            UserAuth user = account.get();
+            StudentUserDomain student = students.findStudent(user.getUserId());
+            return ResponseEntity.ok(new StudentProfileResponse(
+                    user.getUserId(), user.getUsername(), student.getName(), student.getRollNo(),
+                    student.getProgramId(), student.getYearOfRegistration()));
+        } catch (ErpException ex) {
+            return from(ex);
+        }
+    }
 
     @PostMapping("/{uid}/register")
     public ResponseEntity<?> register(@PathVariable String uid, @RequestBody RegisterRequest request) {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (isStudentUnauthorized(auth, uid)) {
-            LOGGER.warn("Unauthorized registration attempt by {}", auth != null ? auth.getName() : "anonymous");
-            return error(HttpStatus.FORBIDDEN, ErrorCode.AUTH_NOT_AUTHENTICATED);
+        if (!currentUser.isStudent(uid)) {
+            LOGGER.warn("Unauthorized registration attempt by {}", currentUser.username());
+            return error(HttpStatus.FORBIDDEN, ErrorCode.STUDENT_FORBIDDEN);
         }
         try {
             if (maintenance.isReadOnly()) {
@@ -70,22 +88,19 @@ public class StudentController {
             return from(ex);
         } catch (Exception ex) {
             LOGGER.error("Unexpected registration failure for {} section {}", uid, request.sectionId(), ex);
-            return error(HttpStatus.BAD_REQUEST,
-                    ErrorCode.STUDENT_REGISTRATION_FAILED,
-                    ErrorCode.STUDENT_REGISTRATION_FAILED.format(uid, request.sectionId()));
+            return error(HttpStatus.BAD_REQUEST, ErrorCode.STUDENT_REGISTRATION_FAILED);
         }
     }
 
     @PostMapping("/{uid}/drop")
     public ResponseEntity<?> drop(@PathVariable String uid, @RequestBody DropRequest request) {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (isStudentUnauthorized(auth, uid)) {
-            LOGGER.warn("Unauthorized drop attempt by {}", auth != null ? auth.getName() : "anonymous");
-            return error(HttpStatus.FORBIDDEN, ErrorCode.AUTH_NOT_AUTHENTICATED);
+        if (!currentUser.isStudent(uid)) {
+            LOGGER.warn("Unauthorized drop attempt by {}", currentUser.username());
+            return error(HttpStatus.FORBIDDEN, ErrorCode.STUDENT_FORBIDDEN);
         }
         try {
             if (maintenance.isReadOnly()) {
-                return error(HttpStatus.SERVICE_UNAVAILABLE, ErrorCode.STUDENT_REGISTRATION_BLOCKED);
+                return error(HttpStatus.SERVICE_UNAVAILABLE, ErrorCode.MAINTENANCE_WRITE_BLOCKED);
             }
             boolean dropped = sections.dropStudent(uid, request.sectionId());
             return ResponseEntity.ok(Map.of("dropped", dropped));
@@ -93,9 +108,7 @@ public class StudentController {
             return from(ex);
         } catch (Exception ex) {
             LOGGER.error("Unexpected drop failure for {} section {}", uid, request.sectionId(), ex);
-            return error(HttpStatus.BAD_REQUEST,
-                    ErrorCode.STUDENT_DROP_FAILED,
-                    ErrorCode.STUDENT_DROP_FAILED.format(uid, request.sectionId()));
+            return error(HttpStatus.BAD_REQUEST, ErrorCode.STUDENT_DROP_FAILED);
         }
     }
 
@@ -103,10 +116,9 @@ public class StudentController {
     public ResponseEntity<?> timetable(@PathVariable String uid,
                                        @RequestParam String semester,
                                        @RequestParam int year) {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (isStudentUnauthorized(auth, uid)) {
-            LOGGER.warn("Unauthorized timetable request by {}", auth != null ? auth.getName() : "anonymous");
-            return error(HttpStatus.FORBIDDEN, ErrorCode.AUTH_NOT_AUTHENTICATED);
+        if (!currentUser.isStudent(uid)) {
+            LOGGER.warn("Unauthorized timetable request by {}", currentUser.username());
+            return error(HttpStatus.FORBIDDEN, ErrorCode.STUDENT_FORBIDDEN);
         }
         try {
             List<StudentTimeTableSlotDomain> slots = sections.timetableForStudent(uid, semester, year);
@@ -118,18 +130,15 @@ public class StudentController {
             return from(ex);
         } catch (Exception ex) {
             LOGGER.error("Unexpected timetable failure for {}", uid, ex);
-            return error(HttpStatus.INTERNAL_SERVER_ERROR,
-                    ErrorCode.STUDENT_TIMETABLE_FAILED,
-                    ErrorCode.STUDENT_TIMETABLE_FAILED.format(uid));
+            return error(HttpStatus.INTERNAL_SERVER_ERROR, ErrorCode.STUDENT_TIMETABLE_FAILED);
         }
     }
 
     @GetMapping("/{uid}/grades")
     public ResponseEntity<?> grades(@PathVariable String uid) {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (isStudentUnauthorized(auth, uid)) {
-            LOGGER.warn("Unauthorized grades request by {}", auth != null ? auth.getName() : "anonymous");
-            return error(HttpStatus.FORBIDDEN, ErrorCode.AUTH_NOT_AUTHENTICATED);
+        if (!currentUser.isStudent(uid)) {
+            LOGGER.warn("Unauthorized grades request by {}", currentUser.username());
+            return error(HttpStatus.FORBIDDEN, ErrorCode.STUDENT_FORBIDDEN);
         }
         try {
             List<StudentGradeDomain> grades = sections.gradesForStudent(uid);
@@ -141,66 +150,27 @@ public class StudentController {
             return from(ex);
         } catch (Exception ex) {
             LOGGER.error("Unexpected grades failure for {}", uid, ex);
-            return error(HttpStatus.INTERNAL_SERVER_ERROR,
-                    ErrorCode.STUDENT_GRADES_FAILED,
-                    ErrorCode.STUDENT_GRADES_FAILED.format(uid));
+            return error(HttpStatus.INTERNAL_SERVER_ERROR, ErrorCode.STUDENT_GRADES_FAILED);
         }
     }
 
-    @GetMapping(value = "/{uid}/transcript.csv", produces = MediaType.TEXT_PLAIN_VALUE)
-    public ResponseEntity<?> transcriptPath(@PathVariable String uid) {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (isStudentUnauthorized(auth, uid)) {
-            LOGGER.warn("Unauthorized transcript path request by {}", auth != null ? auth.getName() : "anonymous");
-            return error(HttpStatus.FORBIDDEN, ErrorCode.AUTH_NOT_AUTHENTICATED);
-        }
-        try {
-            Path path = sections.exportTranscript(uid);
-            return ResponseEntity.ok(path.toString());
-        } catch (ErpException ex) {
-            return from(ex);
-        } catch (Exception ex) {
-            LOGGER.error("Unexpected transcript export failure for {}", uid, ex);
-            return error(HttpStatus.INTERNAL_SERVER_ERROR,
-                    ErrorCode.STUDENT_TRANSCRIPT_FAILED,
-                    ErrorCode.STUDENT_TRANSCRIPT_FAILED.format(uid));
-        }
-    }
-
-    @GetMapping("/{uid}/transcript/download")
+    @GetMapping({"/{uid}/transcript.csv", "/{uid}/transcript/download"})
     public ResponseEntity<?> transcriptDownload(@PathVariable String uid) {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (isStudentUnauthorized(auth, uid)) {
-            LOGGER.warn("Unauthorized transcript download by {}", auth != null ? auth.getName() : "anonymous");
-            return error(HttpStatus.FORBIDDEN, ErrorCode.AUTH_NOT_AUTHENTICATED);
+        if (!currentUser.isStudent(uid)) {
+            LOGGER.warn("Unauthorized transcript download by {}", currentUser.username());
+            return error(HttpStatus.FORBIDDEN, ErrorCode.STUDENT_FORBIDDEN);
         }
         try {
-            Path path = sections.exportTranscript(uid);
-            FileSystemResource resource = new FileSystemResource(path);
-            if (!resource.exists()) {
-                return error(HttpStatus.NOT_FOUND,
-                        ErrorCode.STUDENT_TRANSCRIPT_FAILED,
-                        "Transcript not available yet");
-            }
+            byte[] csv = sections.exportTranscript(uid);
             return ResponseEntity.ok()
                     .contentType(MediaType.parseMediaType("text/csv"))
                     .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=transcript-" + uid + ".csv")
-                    .body(resource);
+                    .body(csv);
         } catch (ErpException ex) {
             return from(ex);
         } catch (Exception ex) {
             LOGGER.error("Unexpected transcript download failure for {}", uid, ex);
-            return error(HttpStatus.INTERNAL_SERVER_ERROR,
-                    ErrorCode.STUDENT_TRANSCRIPT_FAILED,
-                    ErrorCode.STUDENT_TRANSCRIPT_FAILED.format(uid));
+            return error(HttpStatus.INTERNAL_SERVER_ERROR, ErrorCode.STUDENT_TRANSCRIPT_FAILED);
         }
-    }
-
-    private boolean isStudentUnauthorized(Authentication auth, String expectedUid) {
-        return auth == null
-                || !auth.isAuthenticated()
-                || !expectedUid.equalsIgnoreCase(auth.getName())
-                || auth.getAuthorities().stream()
-                .noneMatch(granted -> "STUDENT".equalsIgnoreCase(granted.getAuthority()));
     }
 }

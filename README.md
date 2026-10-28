@@ -95,23 +95,48 @@ The frontend is currently under development and will consume these APIs for user
 
 ### Database Setup
 
-Create a PostgreSQL database:
+Create an empty PostgreSQL database:
 
-    CREATE DATABASE university_erp;
+    CREATE DATABASE "universityERP";
 
+The schema and demo data are applied automatically on startup by Flyway
+(`src/main/resources/db/migration`). Connection settings come from environment
+variables, with local defaults:
 
-Configure application.properties:
+| Variable      | Default                                         |
+|---------------|-------------------------------------------------|
+| `DB_URL`      | `jdbc:postgresql://localhost:5432/universityERP` |
+| `DB_USERNAME` | `postgres`                                      |
+| `DB_PASSWORD` | `12345`                                         |
 
-    spring.datasource.url=jdbc:postgresql://localhost:5432/university_erp
-    spring.datasource.username=your_username
-    spring.datasource.password=your_password
-    spring.jpa.hibernate.ddl-auto=update
+The DB user needs permission to `CREATE EXTENSION btree_gist` (used to stop a room
+being double-booked). If you have a database from the old `ddl.sql`, drop and
+recreate it; the old schema doesn't match the code.
+
+### Demo accounts
+
+| Username | Password    | Role       |
+|----------|-------------|------------|
+| admin1   | `Admin@123` | Admin      |
+| inst1    | `Inst@123`  | Instructor (INS001, teaches CSE101 + CSE201) |
+| inst2    | `Inst@123`  | Instructor (INS002, teaches MTH101) |
+| stu1     | `Stu@123`   | Student (enrolled in CSE101, CSE201) |
+| stu2     | `Stu@123`   | Student (enrolled in CSE201) |
+
+After logging in, call `GET /api/student/me` or `GET /api/instructor/me` to get the
+user id / instructor code used in the other student and instructor URLs.
+
+### Tests
+
+    ./mvnw test
+
+Integration tests start an embedded PostgreSQL, so no database setup is needed.
 
 ### Build the Project
-    mvn clean install
+    ./mvnw clean install
 
 ### Run the Application
-    mvn spring-boot:run
+    ./mvnw spring-boot:run
 
 
 OR

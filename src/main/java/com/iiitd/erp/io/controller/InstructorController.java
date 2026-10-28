@@ -1,6 +1,7 @@
 package com.iiitd.erp.io.controller;
 
 import com.iiitd.erp.Domain.AssessmentComponentDomain;
+import com.iiitd.erp.Domain.FinalGradeDomain;
 import com.iiitd.erp.Domain.InstructorScoreOverviewDomain;
 import com.iiitd.erp.core.service.AssessmentService;
 import com.iiitd.erp.core.service.ScoreService;
@@ -8,23 +9,26 @@ import com.iiitd.erp.core.service.SectionService;
 import com.iiitd.erp.core.service.TimetableService;
 import com.iiitd.erp.exception.ErrorCode;
 import com.iiitd.erp.exception.ErpException;
+import com.iiitd.erp.io.controller.support.CurrentUser;
 import com.iiitd.erp.io.dto.request.AssessmentComponentRequest;
 import com.iiitd.erp.io.dto.request.UpdateStudentScoresRequest;
 import com.iiitd.erp.io.dto.response.AssessmentComponentResponse;
+import com.iiitd.erp.io.dto.response.FinalGradeResponse;
+import com.iiitd.erp.io.dto.response.InstructorProfileResponse;
 import com.iiitd.erp.io.dto.response.InstructorScoreOverviewResponse;
 import com.iiitd.erp.io.dto.response.InstructorSectionResponse;
 import com.iiitd.erp.io.dto.response.InstructorTimetableSlotResponse;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.http.*;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
+import com.iiitd.erp.persistent.entity.erp_db.Instructor;
 import org.springframework.web.bind.annotation.*;
 
 import jakarta.validation.Valid;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 
 import static com.iiitd.erp.io.controller.support.ApiResponseSupport.error;
@@ -42,25 +46,38 @@ public class InstructorController {
     private final SectionService sectionService;
     private final TimetableService timetableService;
     private final ScoreService scoreService;
-
+    private final CurrentUser currentUser;
 
     public InstructorController(AssessmentService assessments,
                                 SectionService sectionService,
                                 TimetableService timetableService,
-                                ScoreService scoreService) {
+                                ScoreService scoreService,
+                                CurrentUser currentUser) {
         this.assessments = assessments;
         this.sectionService = sectionService;
         this.timetableService = timetableService;
         this.scoreService = scoreService;
+        this.currentUser = currentUser;
+    }
+
+    @GetMapping("/me")
+    public ResponseEntity<?> me() {
+        Optional<Instructor> instructor = currentUser.instructor();
+        if (instructor.isEmpty()) {
+            return error(HttpStatus.FORBIDDEN, ErrorCode.INSTRUCTOR_FORBIDDEN);
+        }
+        Instructor i = instructor.get();
+        return ResponseEntity.ok(new InstructorProfileResponse(
+                i.getInstructorId(), currentUser.username(), i.getInstructorCode(), i.getName(),
+                i.getDepartmentId(), i.getEmail(), i.getPhone()));
     }
 
 
     @GetMapping("/{instructorCode}/sections/{sectionId}/assessments")
     public ResponseEntity<?> listAssessments(@PathVariable String instructorCode,
                                              @PathVariable String sectionId) {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (isInstructor(auth, instructorCode)) {
-            LOGGER.warn("Unauthorized assessment list attempt by {}", auth != null ? auth.getName() : "anonymous");
+        if (!currentUser.isInstructor(instructorCode)) {
+            LOGGER.warn("Unauthorized assessment list attempt by {}", currentUser.username());
             return error(HttpStatus.FORBIDDEN, ErrorCode.INSTRUCTOR_FORBIDDEN);
         }
         try {
@@ -78,9 +95,8 @@ public class InstructorController {
     public ResponseEntity<?> createAssessment(@PathVariable String instructorCode,
                                               @PathVariable String sectionId,
                                               @RequestBody @Valid AssessmentComponentRequest request) {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (isInstructor(auth, instructorCode)) {
-            LOGGER.warn("Unauthorized assessment create attempt by {}", auth != null ? auth.getName() : "anonymous");
+        if (!currentUser.isInstructor(instructorCode)) {
+            LOGGER.warn("Unauthorized assessment create attempt by {}", currentUser.username());
             return error(HttpStatus.FORBIDDEN, ErrorCode.INSTRUCTOR_FORBIDDEN);
         }
         try {
@@ -101,9 +117,8 @@ public class InstructorController {
                                               @PathVariable String sectionId,
                                               @PathVariable UUID componentId,
                                               @RequestBody @Valid AssessmentComponentRequest request) {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (isInstructor(auth, instructorCode)) {
-            LOGGER.warn("Unauthorized assessment update attempt by {}", auth != null ? auth.getName() : "anonymous");
+        if (!currentUser.isInstructor(instructorCode)) {
+            LOGGER.warn("Unauthorized assessment update attempt by {}", currentUser.username());
             return error(HttpStatus.FORBIDDEN, ErrorCode.INSTRUCTOR_FORBIDDEN);
         }
         try {
@@ -124,9 +139,8 @@ public class InstructorController {
     public ResponseEntity<?> deleteAssessment(@PathVariable String instructorCode,
                                               @PathVariable String sectionId,
                                               @PathVariable UUID componentId) {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (isInstructor(auth, instructorCode)) {
-            LOGGER.warn("Unauthorized assessment delete attempt by {}", auth != null ? auth.getName() : "anonymous");
+        if (!currentUser.isInstructor(instructorCode)) {
+            LOGGER.warn("Unauthorized assessment delete attempt by {}", currentUser.username());
             return error(HttpStatus.FORBIDDEN, ErrorCode.INSTRUCTOR_FORBIDDEN);
         }
         try {
@@ -144,9 +158,8 @@ public class InstructorController {
     public ResponseEntity<?> listSections(@PathVariable String instructorCode,
                                           @RequestParam(required = false) String semester,
                                           @RequestParam(required = false) Integer year) {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (!isInstructor(auth, instructorCode)) {
-            LOGGER.warn("Unauthorized section list attempt by {}", auth.getName());
+        if (!currentUser.isInstructor(instructorCode)) {
+            LOGGER.warn("Unauthorized section list attempt by {}", currentUser.username());
             return error(HttpStatus.FORBIDDEN, ErrorCode.INSTRUCTOR_FORBIDDEN);
         }
         try {
@@ -168,9 +181,8 @@ public class InstructorController {
     public ResponseEntity<?> timetable(@PathVariable String instructorCode,
                                        @RequestParam(required = false) String semester,
                                        @RequestParam(required = false) Integer year) {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (!isInstructor(auth, instructorCode)) {
-            LOGGER.warn("Unauthorized timetable request by {}", auth.getName());
+        if (!currentUser.isInstructor(instructorCode)) {
+            LOGGER.warn("Unauthorized timetable request by {}", currentUser.username());
             return error(HttpStatus.FORBIDDEN, ErrorCode.INSTRUCTOR_FORBIDDEN);
         }
         try {
@@ -191,9 +203,8 @@ public class InstructorController {
     @GetMapping("/{instructorCode}/sections/{sectionId}/students")
     public ResponseEntity<?> listStudents(@PathVariable String instructorCode,
                                           @PathVariable String sectionId) {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (!isInstructor(auth, instructorCode)) {
-            LOGGER.warn("Unauthorized student list attempt by {}", auth.getName());
+        if (!currentUser.isInstructor(instructorCode)) {
+            LOGGER.warn("Unauthorized student list attempt by {}", currentUser.username());
             return error(HttpStatus.FORBIDDEN, ErrorCode.INSTRUCTOR_FORBIDDEN);
         }
         try {
@@ -209,14 +220,13 @@ public class InstructorController {
     public ResponseEntity<?> updateScores(@PathVariable String instructorCode,
                                           @PathVariable String sectionId,
                                           @RequestBody @Valid UpdateStudentScoresRequest request) {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (!isInstructor(auth, instructorCode)) {
-            LOGGER.warn("Unauthorized score update by {}", auth.getName());
+        if (!currentUser.isInstructor(instructorCode)) {
+            LOGGER.warn("Unauthorized score update by {}", currentUser.username());
             return error(HttpStatus.FORBIDDEN, ErrorCode.INSTRUCTOR_FORBIDDEN);
         }
         try {
             InstructorScoreOverviewDomain overview = scoreService.updateScores(
-                    instructorCode, sectionId, request, auth.getName());
+                    instructorCode, sectionId, request, currentUser.username());
             return ResponseEntity.ok(toScoreResponse(overview));
         } catch (ErpException ex) {
             LOGGER.error("Score update failed for instructor {} section {}", instructorCode, sectionId, ex);
@@ -227,9 +237,8 @@ public class InstructorController {
     @GetMapping("/{instructorCode}/sections/{sectionId}/scores/export")
     public ResponseEntity<?> exportScores(@PathVariable String instructorCode,
                                           @PathVariable String sectionId) {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (!isInstructor(auth, instructorCode)) {
-            LOGGER.warn("Unauthorized score export by {}", auth.getName());
+        if (!currentUser.isInstructor(instructorCode)) {
+            LOGGER.warn("Unauthorized score export by {}", currentUser.username());
             return error(HttpStatus.FORBIDDEN, ErrorCode.INSTRUCTOR_FORBIDDEN);
         }
         try {
@@ -250,14 +259,13 @@ public class InstructorController {
     public ResponseEntity<?> importScores(@PathVariable String instructorCode,
                                           @PathVariable String sectionId,
                                           @RequestParam("file") MultipartFile file) {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (!isInstructor(auth, instructorCode)) {
-            LOGGER.warn("Unauthorized score import by {}", auth.getName());
+        if (!currentUser.isInstructor(instructorCode)) {
+            LOGGER.warn("Unauthorized score import by {}", currentUser.username());
             return error(HttpStatus.FORBIDDEN, ErrorCode.INSTRUCTOR_FORBIDDEN);
         }
         try {
             InstructorScoreOverviewDomain overview = scoreService.importCsv(
-                    instructorCode, sectionId, file, auth.getName());
+                    instructorCode, sectionId, file, currentUser.username());
             return ResponseEntity.ok(toScoreResponse(overview));
         } catch (ErpException ex) {
             LOGGER.error("Score import failed for instructor {} section {}", instructorCode, sectionId, ex);
@@ -267,12 +275,41 @@ public class InstructorController {
 
 
 
-    private boolean isInstructor(Authentication auth, String expectedCode) {
-        return auth == null
-                || !auth.isAuthenticated()
-                || !expectedCode.equalsIgnoreCase(auth.getName())
-                || auth.getAuthorities().stream()
-                .noneMatch(granted -> "INSTRUCTOR".equalsIgnoreCase(granted.getAuthority()));
+    @PostMapping("/{instructorCode}/sections/{sectionId}/grades/compute")
+    public ResponseEntity<?> computeGrades(@PathVariable String instructorCode,
+                                           @PathVariable String sectionId) {
+        if (!currentUser.isInstructor(instructorCode)) {
+            LOGGER.warn("Unauthorized grade computation by {}", currentUser.username());
+            return error(HttpStatus.FORBIDDEN, ErrorCode.INSTRUCTOR_FORBIDDEN);
+        }
+        try {
+            return ResponseEntity.ok(toFinalGradeResponse(scoreService.computeFinalGrades(instructorCode, sectionId)));
+        } catch (ErpException ex) {
+            LOGGER.error("Grade computation failed for instructor {} section {}", instructorCode, sectionId, ex);
+            return from(ex);
+        }
+    }
+
+    @GetMapping("/{instructorCode}/sections/{sectionId}/grades")
+    public ResponseEntity<?> finalGrades(@PathVariable String instructorCode,
+                                         @PathVariable String sectionId) {
+        if (!currentUser.isInstructor(instructorCode)) {
+            LOGGER.warn("Unauthorized final grade request by {}", currentUser.username());
+            return error(HttpStatus.FORBIDDEN, ErrorCode.INSTRUCTOR_FORBIDDEN);
+        }
+        try {
+            return ResponseEntity.ok(toFinalGradeResponse(scoreService.finalGrades(instructorCode, sectionId)));
+        } catch (ErpException ex) {
+            LOGGER.error("Final grade fetch failed for instructor {} section {}", instructorCode, sectionId, ex);
+            return from(ex);
+        }
+    }
+
+    private List<FinalGradeResponse> toFinalGradeResponse(List<FinalGradeDomain> grades) {
+        return grades.stream()
+                .map(g -> new FinalGradeResponse(g.getEnrollmentId(), g.getStudentId(), g.getRollNo(),
+                        g.getStudentName(), g.getTotalScore(), g.getFinalGrade()))
+                .toList();
     }
 
     private InstructorScoreOverviewResponse toScoreResponse(InstructorScoreOverviewDomain overview) {

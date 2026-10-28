@@ -12,5 +12,5 @@ import lombok.extern.jackson.Jacksonized;
 public record LoginRequest (
     @NotBlank String username,
     @NotBlank String password,
-    @NotBlank String role
+    String role
 ){}

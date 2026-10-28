@@ -49,7 +49,7 @@ public class EnrollmentPersistPortImpl implements EnrollmentPersistPort {
 
     @Override
     public long countEnrolled(String sectionId) {
-        return repo.countBySectionIdAndStatusIgnoreCase(sectionId, "ENROLLED");
+        return repo.countBySectionIdAndStatusIgnoreCase(sectionId, EnrollmentDomain.ENROLLED);
     }
 
     @Override
@@ -59,7 +59,7 @@ public class EnrollmentPersistPortImpl implements EnrollmentPersistPort {
                         .enrollmentId(p.getEnrollmentId())
                         .studentId(p.getStudentId())
                         .sectionId(sectionId)
-                        .status("ENROLLED")
+                        .status(EnrollmentDomain.ENROLLED)
                         .build())
                 .toList();
     }

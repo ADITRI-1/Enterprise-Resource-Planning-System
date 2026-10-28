@@ -23,7 +23,7 @@ public class GlobalApiExceptionHandler {
     public ResponseEntity<ApiErrorResponse> handleErpException(ErpException ex) {
         LOGGER.error("Handled ErpException [{}] context={}", ex.getErrorCode().getCode(), ex.getContext(), ex);
         return ResponseEntity.status(ApiResponseSupport.resolveStatus(ex.getErrorCode()))
-                .body(ApiErrorResponse.of(ex.getErrorCode(), ex.getMessage()));
+                .body(ApiErrorResponse.of(ex.getErrorCode(), ex.getMessage(), ex.getContext()));
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)

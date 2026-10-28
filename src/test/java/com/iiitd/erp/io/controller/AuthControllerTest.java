@@ -11,6 +11,7 @@ import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
@@ -28,6 +29,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(AuthController.class)
+@Import(MaintenanceReadOnlyInterceptor.class)
 @AutoConfigureMockMvc(addFilters = false)
 class AuthControllerTest {
 
@@ -35,7 +37,6 @@ class AuthControllerTest {
 
     @MockitoBean AuthSessionService authSessionService;
     @MockitoBean MaintenanceService maintenanceService;
-    @MockitoBean MaintenanceReadOnlyInterceptor maintenanceInterceptor;
 
     @Test
     void login_success() throws Exception {
@@ -46,7 +47,7 @@ class AuthControllerTest {
                 .sessionId("sid123")
                 .build();
 
-        Mockito.when(authSessionService.loginAndCreateSession(eq("admin1"), eq("password"), any()))
+        Mockito.when(authSessionService.loginAndCreateSession(eq("admin1"), eq("password"), any(), any()))
                 .thenReturn(domain);
 
         mvc.perform(post("/api/auth/login")
@@ -59,7 +60,7 @@ class AuthControllerTest {
 
     @Test
     void login_business_error_returns_401() throws Exception {
-        Mockito.when(authSessionService.loginAndCreateSession(eq("admin1"), eq("wrong"), any()))
+        Mockito.when(authSessionService.loginAndCreateSession(eq("admin1"), eq("wrong"), any(), any()))
                 .thenThrow(ErpException.of(ErrorCode.AUTHENTICATION_FAILED, Map.of()));
 
         mvc.perform(post("/api/auth/login")
@@ -72,7 +73,7 @@ class AuthControllerTest {
 
     @Test
     void login_unexpected_error_returns_500() throws Exception {
-        Mockito.when(authSessionService.loginAndCreateSession(eq("admin1"), eq("password"), any()))
+        Mockito.when(authSessionService.loginAndCreateSession(eq("admin1"), eq("password"), any(), any()))
                 .thenThrow(new RuntimeException("boom"));
 
         mvc.perform(post("/api/auth/login")

@@ -5,7 +5,6 @@ import com.iiitd.erp.Domain.SectionDomain;
 import com.iiitd.erp.Domain.StudentGradeDomain;
 import com.iiitd.erp.Domain.StudentTimeTableSlotDomain;
 
-import java.nio.file.Path;
 import java.util.List;
 
 public interface SectionService {
@@ -21,5 +20,5 @@ public interface SectionService {
     boolean dropStudent(String studentUserId, String sectionId);
     List<StudentTimeTableSlotDomain> timetableForStudent(String studentUserId, String semester, int year);
     List<StudentGradeDomain> gradesForStudent(String studentUserId);
-    Path exportTranscript(String studentUserId);
+    byte[] exportTranscript(String studentUserId);
 }

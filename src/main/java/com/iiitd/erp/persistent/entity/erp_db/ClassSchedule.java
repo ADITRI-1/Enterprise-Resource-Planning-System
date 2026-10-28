@@ -25,7 +25,7 @@ public class ClassSchedule {
     private String sectionId;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "day_of_week", nullable = false, columnDefinition = "weekday")
+    @Column(name = "day_of_week", nullable = false, length = 10)
     private Weekday dayOfWeek;
 
     @Column(name = "start_time", nullable = false)

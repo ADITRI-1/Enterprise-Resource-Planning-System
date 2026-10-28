@@ -13,6 +13,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 import static com.iiitd.erp.mappers.DomainToEntityMapper.DOMAIN_TO_ENTITY_MAPPER_INSTANCE;
@@ -34,6 +35,10 @@ public class AssessmentScorePersistPortImpl implements AssessmentScorePersistPor
         LOGGER.debug("Upserting score for enrollment {} component {}", domain.getEnrollmentId(), domain.getComponentId());
         try {
             AssessmentScore entity = DOMAIN_TO_ENTITY_MAPPER_INSTANCE.assessmentScoreDomainToAssessmentScore(domain);
+            // Update the existing (enrollment, component) row if there is one, otherwise insert with a new id.
+            entity.setScoreId(repository.findByEnrollmentIdAndComponentId(domain.getEnrollmentId(), domain.getComponentId())
+                    .map(AssessmentScore::getScoreId)
+                    .orElseGet(UUID::randomUUID));
             AssessmentScore saved = repository.save(entity);
             LOGGER.info("Saved score {} for enrollment {} component {}", saved.getScoreId(), saved.getEnrollmentId(), saved.getComponentId());
             return ENTITY_TO_DOMAIN_MAPPER_INSTANCE.assessmentScoreToDomain(saved);

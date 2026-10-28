@@ -66,10 +66,15 @@ public class SecurityConfig {
         .anyRequest().authenticated()
       )
             .exceptionHandling(eh -> eh
+                    .authenticationEntryPoint((request, response, authException) -> {
+                      response.setStatus(401);
+                      response.setContentType("application/json");
+                      response.getWriter().write("{\"errorCode\":\"API-002\",\"message\":\"Please log in to continue\"}");
+                    })
                     .accessDeniedHandler((request, response, accessDeniedException) -> {
                       response.setStatus(403);
                       response.setContentType("application/json");
-                      response.getWriter().write("{\"error\": \"Wrong userRole\"}");
+                      response.getWriter().write("{\"errorCode\":\"API-006\",\"message\":\"Your role is not allowed to do this\"}");
                     })
             );
     return http.build();

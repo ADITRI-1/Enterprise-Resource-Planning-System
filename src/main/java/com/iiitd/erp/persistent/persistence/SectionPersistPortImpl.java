@@ -43,6 +43,13 @@ public class SectionPersistPortImpl implements SectionPersistPort {
     }
 
     @Override
+    public SectionDomain lockForUpdate(String sectionId) {
+        return sectionRepository.findByIdForUpdate(sectionId)
+                .map(ENTITY_TO_DOMAIN_MAPPER_INSTANCE::sectionToSectionDomain)
+                .orElse(null);
+    }
+
+    @Override
     public SectionDomain save(SectionDomain sectionDomain) {
         LOGGER.debug("Persisting section {}", sectionDomain.getSectionId());
         try {

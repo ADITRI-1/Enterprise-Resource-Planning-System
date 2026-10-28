@@ -150,6 +150,16 @@ public class StudentServiceImpl implements StudentService {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public StudentUserDomain findStudent(UUID studentId) {
+        StudentUserDomain student = studentPersistPort.findByStudentId(studentId);
+        if (student == null) {
+            throw ErpException.of(ErrorCode.STUDENT_NOT_FOUND, Map.of("studentId", studentId));
+        }
+        return student;
+    }
+
+    @Override
     public List<StudentUserDomain> listStudents() {
         LOGGER.info("Listing all students");
         try {

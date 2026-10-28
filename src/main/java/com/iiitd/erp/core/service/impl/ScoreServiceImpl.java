@@ -5,10 +5,13 @@ import com.iiitd.erp.core.AssessmentScorePersistPort;
 import com.iiitd.erp.core.SectionPersistPort;
 import com.iiitd.erp.core.service.AssessmentService;
 import com.iiitd.erp.core.service.ScoreService;
+import com.iiitd.erp.core.service.support.GradeScale;
 import com.iiitd.erp.exception.ErpException;
 import com.iiitd.erp.exception.ErrorCode;
 import com.iiitd.erp.io.dto.request.UpdateStudentScoresRequest;
+import com.iiitd.erp.persistent.entity.erp_db.Grade;
 import com.iiitd.erp.persistent.persistence.repository.EnrollmentRepository;
+import com.iiitd.erp.persistent.persistence.repository.GradeRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -18,6 +21,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.nio.charset.StandardCharsets;
 import java.time.OffsetDateTime;
 import java.util.*;
@@ -29,20 +33,25 @@ import java.util.stream.Collectors;
 public class ScoreServiceImpl implements ScoreService {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(ScoreServiceImpl.class);
+    public static final String FINAL_COMPONENT = "FINAL";
+    private static final BigDecimal WEIGHT_TOLERANCE = new BigDecimal("0.001");
 
     private final SectionPersistPort sections;
     private final AssessmentService assessmentService;
     private final AssessmentScorePersistPort scores;
     private final EnrollmentRepository enrollmentRepository;
+    private final GradeRepository grades;
 
     public ScoreServiceImpl(SectionPersistPort sections,
-                                      AssessmentService assessmentService,
-                                      AssessmentScorePersistPort scores,
-                                      EnrollmentRepository enrollmentRepository) {
+                            AssessmentService assessmentService,
+                            AssessmentScorePersistPort scores,
+                            EnrollmentRepository enrollmentRepository,
+                            GradeRepository grades) {
         this.sections = sections;
         this.assessmentService = assessmentService;
         this.scores = scores;
         this.enrollmentRepository = enrollmentRepository;
+        this.grades = grades;
     }
 
     @Override
@@ -123,6 +132,81 @@ public class ScoreServiceImpl implements ScoreService {
     }
 
     @Override
+    public List<FinalGradeDomain> computeFinalGrades(String instructorCode, String sectionId) {
+        InstructorScoreOverviewDomain overview = overview(instructorCode, sectionId);
+        List<AssessmentComponentDomain> components = overview.getComponents();
+        BigDecimal weightSum = components.stream()
+                .map(AssessmentComponentDomain::getWeight)
+                .filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        if (components.isEmpty() || weightSum.subtract(BigDecimal.ONE).abs().compareTo(WEIGHT_TOLERANCE) > 0) {
+            throw ErpException.of(ErrorCode.ASSESSMENT_WEIGHTS_INCOMPLETE,
+                    Map.of("sectionId", sectionId, "weightSum", weightSum));
+        }
+
+        List<FinalGradeDomain> results = new ArrayList<>();
+        for (InstructorStudentScoreDomain student : overview.getStudents()) {
+            // total = sum(score / outOf * weight) * 100; a missing score counts as 0
+            BigDecimal total = BigDecimal.ZERO;
+            for (AssessmentComponentDomain component : components) {
+                double score = student.getComponentScores().getOrDefault(component.getComponentId(), 0.0d);
+                total = total.add(BigDecimal.valueOf(score)
+                        .divide(BigDecimal.valueOf(component.getScoreOutOf()), 6, RoundingMode.HALF_UP)
+                        .multiply(component.getWeight()));
+            }
+            total = total.multiply(BigDecimal.valueOf(100)).setScale(2, RoundingMode.HALF_UP);
+            String letter = GradeScale.letterFor(total);
+
+            Grade grade = grades.findByEnrollmentIdAndComponent(student.getEnrollmentId(), FINAL_COMPONENT)
+                    .orElseGet(() -> Grade.builder()
+                            .gradeId(UUID.randomUUID())
+                            .enrollmentId(student.getEnrollmentId())
+                            .component(FINAL_COMPONENT)
+                            .build());
+            grade.setScore(total);
+            grade.setWeightedScore(total);
+            grade.setFinalGrade(letter);
+            grades.save(grade);
+
+            results.add(FinalGradeDomain.builder()
+                    .enrollmentId(student.getEnrollmentId())
+                    .studentId(student.getStudentId())
+                    .rollNo(student.getRollNo())
+                    .studentName(student.getStudentName())
+                    .totalScore(total)
+                    .finalGrade(letter)
+                    .build());
+        }
+        LOGGER.info("Computed final grades for {} students in section {}", results.size(), sectionId);
+        return results;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<FinalGradeDomain> finalGrades(String instructorCode, String sectionId) {
+        ensureSectionOwnership(instructorCode, sectionId);
+        List<EnrollmentRepository.SectionEnrollmentProjection> students = enrollmentRepository.findActiveStudents(sectionId);
+        Map<UUID, Grade> finals = grades.findByEnrollmentIdInAndComponent(
+                        students.stream().map(EnrollmentRepository.SectionEnrollmentProjection::getEnrollmentId).toList(),
+                        FINAL_COMPONENT)
+                .stream()
+                .collect(Collectors.toMap(Grade::getEnrollmentId, Function.identity()));
+        return students.stream()
+                .map(p -> {
+                    Grade g = finals.get(p.getEnrollmentId());
+                    return FinalGradeDomain.builder()
+                            .enrollmentId(p.getEnrollmentId())
+                            .studentId(p.getStudentId())
+                            .rollNo(p.getRollNo())
+                            .studentName(p.getStudentName())
+                            .totalScore(g == null ? null : g.getScore())
+                            .finalGrade(g == null ? null : g.getFinalGrade())
+                            .build();
+                })
+                .toList();
+    }
+
+    @Override
     public InstructorScoreOverviewDomain importCsv(String instructorCode, String sectionId,
                                                    MultipartFile file, String updatedBy) {
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(file.getInputStream(), StandardCharsets.UTF_8))) {
@@ -132,7 +216,7 @@ public class ScoreServiceImpl implements ScoreService {
                         Map.of("reason", "empty file"));
             }
             String[] headers = lines.get(0).split(",");
-            UpdateStudentScoresRequest request = parseCsv(sectionId, lines, headers);
+            UpdateStudentScoresRequest request = parseCsv(instructorCode, sectionId, lines, headers);
             return updateScores(instructorCode, sectionId, request, updatedBy);
         } catch (ErpException ex) {
             throw ex;
@@ -143,28 +227,56 @@ public class ScoreServiceImpl implements ScoreService {
         }
     }
 
-    private UpdateStudentScoresRequest parseCsv(String sectionId, List<String> lines, String[] headers) {
+    private UpdateStudentScoresRequest parseCsv(String instructorCode, String sectionId,
+                                                List<String> lines, String[] headers) {
         if (headers.length < 5) {
             throw ErpException.of(ErrorCode.ASSESSMENT_SCORE_IMPORT_FAILED,
                     Map.of("reason", "missing component headers"));
         }
+        // Columns 4.. are components; the export writes names, but ids are accepted too.
+        Map<String, UUID> componentsByKey = new HashMap<>();
+        for (AssessmentComponentDomain component : assessmentService.list(instructorCode, sectionId)) {
+            componentsByKey.put(component.getName().trim().toLowerCase(Locale.ROOT), component.getComponentId());
+            componentsByKey.put(component.getComponentId().toString(), component.getComponentId());
+        }
+        List<UUID> columnComponents = new ArrayList<>();
+        for (int c = 4; c < headers.length; c++) {
+            String key = unquote(headers[c]).toLowerCase(Locale.ROOT);
+            UUID componentId = componentsByKey.get(key);
+            if (componentId == null) {
+                throw ErpException.of(ErrorCode.ASSESSMENT_SCORE_IMPORT_FAILED,
+                        Map.of("reason", "unknown component column", "column", unquote(headers[c])));
+            }
+            columnComponents.add(componentId);
+        }
+
         List<UpdateStudentScoresRequest.StudentScoreEntry> entries = new ArrayList<>();
         for (int i = 1; i < lines.size(); i++) {
-            String[] cols = lines.get(i).split(",");
+            if (lines.get(i).isBlank()) continue;
+            String[] cols = lines.get(i).split(",", -1);
             if (cols.length != headers.length) {
                 throw ErpException.of(ErrorCode.ASSESSMENT_SCORE_IMPORT_FAILED,
                         Map.of("line", i + 1, "reason", "column mismatch"));
             }
-            UUID enrollmentId = UUID.fromString(cols[0].trim());
+            UUID enrollmentId = UUID.fromString(unquote(cols[0]));
             List<UpdateStudentScoresRequest.ComponentScore> componentScores = new ArrayList<>();
             for (int c = 4; c < headers.length; c++) {
-                UUID componentId = UUID.fromString(headers[c].trim());
-                double score = Double.parseDouble(cols[c].trim());
-                componentScores.add(new UpdateStudentScoresRequest.ComponentScore(componentId, score));
+                String raw = unquote(cols[c]);
+                if (raw.isEmpty()) continue;
+                componentScores.add(new UpdateStudentScoresRequest.ComponentScore(
+                        columnComponents.get(c - 4), Double.parseDouble(raw)));
             }
             entries.add(new UpdateStudentScoresRequest.StudentScoreEntry(enrollmentId, componentScores));
         }
         return new UpdateStudentScoresRequest(entries);
+    }
+
+    private static String unquote(String value) {
+        String v = value.trim();
+        if (v.length() >= 2 && v.startsWith("\"") && v.endsWith("\"")) {
+            v = v.substring(1, v.length() - 1).replace("\"\"", "\"");
+        }
+        return v.trim();
     }
 
     private void validateScore(double score, AssessmentComponentDomain component) {

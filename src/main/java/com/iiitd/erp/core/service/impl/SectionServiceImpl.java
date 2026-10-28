@@ -6,7 +6,7 @@ import com.iiitd.erp.core.service.SectionService;
 import com.iiitd.erp.core.service.support.SemesterTerm;
 import com.iiitd.erp.exception.ErrorCode;
 import com.iiitd.erp.exception.ErpException;
-import com.iiitd.erp.io.dto.response.GradeRow;
+import com.iiitd.erp.persistent.entity.erp_db.Grade;
 import com.iiitd.erp.persistent.persistence.repository.GradeRepository;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -14,8 +14,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.time.LocalDate;
 import java.time.OffsetDateTime;
 import java.util.*;
@@ -26,6 +24,7 @@ import java.util.stream.Collectors;
 public class SectionServiceImpl implements SectionService {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(SectionServiceImpl.class);
+    private static final String FINAL_COMPONENT = ScoreServiceImpl.FINAL_COMPONENT;
 
     private final SectionPersistPort sections;
     private final CoursePersistPort courses;
@@ -188,21 +187,32 @@ public class SectionServiceImpl implements SectionService {
     @Override
     public RegistrationOutcomeDomain registerStudent(String studentUserId, String sectionId) {
         UUID studentId = requireStudent(studentUserId);
-        SectionDomain section = requireSection(sectionId);
+        // Lock the section row so concurrent registrations can't both take the last seat.
+        SectionDomain section = lockSection(sectionId);
         LOGGER.info("Student {} attempting registration for section {}", studentUserId, sectionId);
 
         ensureRegistrationOpen(section);
-        ensureNotDuplicate(studentId, sectionId);
+        Optional<EnrollmentDomain> existing = enrollments.findByStudentAndSection(studentId, sectionId);
+        if (existing.filter(e -> EnrollmentDomain.ENROLLED.equalsIgnoreCase(e.getStatus())).isPresent()) {
+            throw ErpException.of(ErrorCode.ALREADY_ENROLLED, Map.of("sectionId", sectionId));
+        }
         ensureCapacity(sectionId, section.getCapacity());
 
-        enrollments.save(EnrollmentDomain.builder()
-                .enrollmentId(UUID.randomUUID())
-                .studentId(studentId)
-                .sectionId(sectionId)
-                .enrollmentDate(OffsetDateTime.now())
-                .status("ENROLLED")
-                .build());
-        bumpSectionCount(sectionId, 1);
+        // (student, section) is unique, so a previously dropped enrollment is reactivated.
+        EnrollmentDomain enrollment = existing
+                .map(e -> e.toBuilder()
+                        .status(EnrollmentDomain.ENROLLED)
+                        .enrollmentDate(OffsetDateTime.now())
+                        .build())
+                .orElseGet(() -> EnrollmentDomain.builder()
+                        .enrollmentId(UUID.randomUUID())
+                        .studentId(studentId)
+                        .sectionId(sectionId)
+                        .enrollmentDate(OffsetDateTime.now())
+                        .status(EnrollmentDomain.ENROLLED)
+                        .build());
+        enrollments.save(enrollment);
+        syncSectionCount(section);
 
         return RegistrationOutcomeDomain.builder().status("OK").message("Registered successfully").build();
     }
@@ -210,18 +220,18 @@ public class SectionServiceImpl implements SectionService {
     @Override
     public boolean dropStudent(String studentUserId, String sectionId) {
         UUID studentId = requireStudent(studentUserId);
-        SectionDomain section = requireSection(sectionId);
+        SectionDomain section = lockSection(sectionId);
         LOGGER.info("Student {} attempting drop for section {}", studentUserId, sectionId);
 
         ensureDropAllowed(section);
 
         EnrollmentDomain enrollment = enrollments.findByStudentAndSection(studentId, sectionId)
-                .filter(e -> "ENROLLED".equalsIgnoreCase(e.getStatus()))
+                .filter(e -> EnrollmentDomain.ENROLLED.equalsIgnoreCase(e.getStatus()))
                 .orElseThrow(() -> ErpException.of(ErrorCode.STUDENT_NOT_IN_SECTION,
                         Map.of("sectionId", sectionId, "studentId", studentUserId)));
 
-        enrollments.save(enrollment.toBuilder().status("DROPPED").build());
-        bumpSectionCount(sectionId, -1);
+        enrollments.save(enrollment.toBuilder().status(EnrollmentDomain.DROPPED).build());
+        syncSectionCount(section);
         return true;
     }
 
@@ -231,7 +241,7 @@ public class SectionServiceImpl implements SectionService {
         UUID studentId = requireStudent(studentUserId);
         String normalizedSemester = normalizeSemester(semester);
 
-        List<EnrollmentDomain> active = enrollments.findByStudentAndStatus(studentId, "ENROLLED");
+        List<EnrollmentDomain> active = enrollments.findByStudentAndStatus(studentId, EnrollmentDomain.ENROLLED);
         if (active.isEmpty()) {
             return List.of();
         }
@@ -263,11 +273,7 @@ public class SectionServiceImpl implements SectionService {
     public List<StudentGradeDomain> gradesForStudent(String studentUserId) {
         UUID studentId = requireStudent(studentUserId);
         try {
-            List<StudentGradeDomain> rows = grades.findByStudent(studentId).stream().toList();
-            if (rows.isEmpty()) {
-                return buildGradesFromAssessments(studentId);
-            }
-            return rows;
+            return buildGradesFromAssessments(studentId);
         } catch (Exception ex) {
             LOGGER.error("Failed to fetch grades for student {}", studentUserId, ex);
             throw ErpException.wrap(ErrorCode.STUDENT_GRADES_FAILED, ex, Map.of("studentId", studentUserId));
@@ -276,24 +282,17 @@ public class SectionServiceImpl implements SectionService {
 
     @Override
     @Transactional(readOnly = true)
-    public Path exportTranscript(String studentUserId) {
+    public byte[] exportTranscript(String studentUserId) {
         List<StudentGradeDomain> gradeRows = gradesForStudent(studentUserId);
         StringBuilder sb = new StringBuilder();
         sb.append("CourseCode,CourseTitle,Component,Score,FinalGrade\n");
         gradeRows.forEach(row -> sb.append(escape(row.getCourseCode())).append(',')
                 .append(escape(row.getCourseTitle())).append(',')
                 .append(escape(row.getComponent())).append(',')
-                .append(row.getScore()).append(',')
+                .append(row.getScore() == null ? "" : row.getScore().toPlainString()).append(',')
                 .append(escape(row.getFinalGrade())).append('\n'));
-        try {
-            Path file = Files.createTempFile("transcript-" + studentUserId + "-", ".csv");
-            Files.writeString(file, sb.toString(), StandardCharsets.UTF_8);
-            LOGGER.info("Transcript CSV generated for {} at {}", studentUserId, file);
-            return file;
-        } catch (Exception ex) {
-            LOGGER.error("Failed to generate transcript for {}", studentUserId, ex);
-            throw ErpException.wrap(ErrorCode.STUDENT_TRANSCRIPT_FAILED, ex, Map.of("studentId", studentUserId));
-        }
+        LOGGER.info("Transcript CSV generated for {}", studentUserId);
+        return sb.toString().getBytes(StandardCharsets.UTF_8);
     }
 
     // ---------------- helpers ----------------
@@ -319,13 +318,21 @@ public class SectionServiceImpl implements SectionService {
         return section;
     }
 
+    private SectionDomain lockSection(String sectionId) {
+        SectionDomain section = sections.lockForUpdate(sectionId);
+        if (section == null) {
+            throw ErpException.of(ErrorCode.SECTION_NOT_FOUND, Map.of("sectionId", sectionId));
+        }
+        return section;
+    }
+
     private void ensureRegistrationOpen(SectionDomain section) {
         LocalDate today = LocalDate.now();
         if (Boolean.FALSE.equals(section.getActive())) {
-            throw ErpException.of(ErrorCode.STUDENT_REGISTRATION_BLOCKED, Map.of("sectionId", section.getSectionId()));
+            throw ErpException.of(ErrorCode.SECTION_INACTIVE, Map.of("sectionId", section.getSectionId()));
         }
         if (section.getRegistrationDeadline() != null && today.isAfter(section.getRegistrationDeadline())) {
-            throw ErpException.of(ErrorCode.STUDENT_REGISTRATION_BLOCKED,
+            throw ErpException.of(ErrorCode.REGISTRATION_DEADLINE_PASSED,
                     Map.of("sectionId", section.getSectionId(), "deadline", section.getRegistrationDeadline()));
         }
     }
@@ -333,41 +340,36 @@ public class SectionServiceImpl implements SectionService {
     private void ensureDropAllowed(SectionDomain section) {
         LocalDate today = LocalDate.now();
         if (section.getRegistrationDeadline() != null && today.isAfter(section.getRegistrationDeadline())) {
-            throw ErpException.of(ErrorCode.STUDENT_DROP_FAILED,
+            throw ErpException.of(ErrorCode.DROP_DEADLINE_PASSED,
                     Map.of("sectionId", section.getSectionId(), "deadline", section.getRegistrationDeadline()));
         }
-    }
-
-    private void ensureNotDuplicate(UUID studentId, String sectionId) {
-        enrollments.findByStudentAndSection(studentId, sectionId)
-                .filter(e -> "ENROLLED".equalsIgnoreCase(e.getStatus()))
-                .ifPresent(e -> {
-                    throw ErpException.of(ErrorCode.DUPLICATE_STUDENT,
-                            Map.of("studentId", studentId, "sectionId", sectionId));
-                });
     }
 
     private void ensureCapacity(String sectionId, Integer capacity) {
         int cap = capacity == null ? 0 : capacity;
         long enrolled = enrollments.countEnrolled(sectionId);
         if (enrolled >= cap) {
-            throw ErpException.of(ErrorCode.STUDENT_REGISTRATION_FAILED,
-                    Map.of("sectionId", sectionId, "reason", "Section full"));
+            throw ErpException.of(ErrorCode.SECTION_FULL,
+                    Map.of("sectionId", sectionId, "capacity", cap));
         }
     }
 
-    private void bumpSectionCount(String sectionId, int delta) {
-        SectionDomain section = requireSection(sectionId);
-        int current = section.getEnrollmentCount() == null ? 0 : section.getEnrollmentCount();
-        int updated = Math.max(0, current + delta);
-        sections.update(section.withEnrollmentCount(updated));
+    // Recount instead of incrementing so the cached count can't drift from the enrollments table.
+    private void syncSectionCount(SectionDomain section) {
+        int enrolled = (int) enrollments.countEnrolled(section.getSectionId());
+        sections.update(section.withEnrollmentCount(enrolled));
     }
 
     private List<StudentGradeDomain> buildGradesFromAssessments(UUID studentId) {
-        List<EnrollmentDomain> completed = enrollments.findByStudentAndStatuses(studentId, List.of("ENROLLED", "COMPLETED"));
+        List<EnrollmentDomain> completed = enrollments.findByStudentAndStatuses(studentId,
+                List.of(EnrollmentDomain.ENROLLED, EnrollmentDomain.COMPLETED));
         if (completed.isEmpty()) {
             return List.of();
         }
+        Map<UUID, Grade> finals = grades.findByEnrollmentIdInAndComponent(
+                        completed.stream().map(EnrollmentDomain::getEnrollmentId).toList(), FINAL_COMPONENT)
+                .stream()
+                .collect(Collectors.toMap(Grade::getEnrollmentId, g -> g));
         List<StudentGradeDomain> rows = new ArrayList<>();
         for (EnrollmentDomain enrollment : completed) {
             SectionDomain section = sections.findBySectionId(enrollment.getSectionId());
@@ -383,6 +385,8 @@ public class SectionServiceImpl implements SectionService {
                     .filter(sc -> sc.getEnrollmentId().equals(enrollment.getEnrollmentId()))
                     .toList();
 
+            Grade finalGrade = finals.get(enrollment.getEnrollmentId());
+            String letter = finalGrade != null ? finalGrade.getFinalGrade() : null;
             for (AssessmentScoreDomain score : componentScores) {
                 AssessmentComponentDomain comp = componentMap.get(score.getComponentId());
                 rows.add(StudentGradeDomain.builder()
@@ -390,7 +394,16 @@ public class SectionServiceImpl implements SectionService {
                         .courseTitle(courseTitle)
                         .component(comp != null ? comp.getName() : "Component")
                         .score(score.getScore())
-                        .finalGrade(null)
+                        .finalGrade(letter)
+                        .build());
+            }
+            if (finalGrade != null) {
+                rows.add(StudentGradeDomain.builder()
+                        .courseCode(courseCode)
+                        .courseTitle(courseTitle)
+                        .component(FINAL_COMPONENT)
+                        .score(finalGrade.getScore())
+                        .finalGrade(letter)
                         .build());
             }
         }
@@ -421,7 +434,7 @@ public class SectionServiceImpl implements SectionService {
     }
 
     private String escape(String value) {
-        return value == null ? "" : value.replace("\"", "\"\"");
+        return value == null ? "" : '"' + value.replace("\"", "\"\"") + '"';
     }
 
     private CourseDomain ensureCourse(String courseId) {
