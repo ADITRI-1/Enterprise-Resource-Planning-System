@@ -1,6 +1,6 @@
 import {
   BarChart3, BookOpen, Building2, CalendarDays, ClipboardList, DoorOpen, GraduationCap, KeyRound,
-  LayoutDashboard, Layers, ListChecks, School, Users, type LucideIcon,
+  LayoutDashboard, Layers, LineChart, ListChecks, School, ScrollText, Users, type LucideIcon,
 } from "lucide-react";
 import type { Role } from "@/lib/session";
 
@@ -21,7 +21,9 @@ export const NAV: Record<Role, NavItem[]> = {
   ],
   admin: [
     { to: "/admin", label: "Dashboard", icon: LayoutDashboard },
+    { to: "/admin/analytics", label: "Analytics", icon: LineChart },
     { to: "/admin/accounts", label: "Accounts", icon: KeyRound },
+    { to: "/admin/audit", label: "Audit log", icon: ScrollText },
     { to: "/admin/students", label: "Students", icon: Users },
     { to: "/admin/instructors", label: "Instructors", icon: School },
     { to: "/admin/courses", label: "Courses", icon: BookOpen },

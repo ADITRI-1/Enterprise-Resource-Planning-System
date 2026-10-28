@@ -6,6 +6,7 @@ import com.iiitd.erp.core.CoursePersistPort;
 import com.iiitd.erp.core.InstructorPersistPort;
 import com.iiitd.erp.core.SectionPersistPort;
 import com.iiitd.erp.core.service.CatalogService;
+import com.iiitd.erp.core.service.PrerequisiteService;
 import com.iiitd.erp.exception.ErpException;
 import com.iiitd.erp.exception.ErrorCode;
 import org.slf4j.Logger;
@@ -28,11 +29,14 @@ public class CatalogServiceImpl implements CatalogService {
     private final SectionPersistPort sections;
     private final InstructorPersistPort instructors;
     private final ClassSchedulePersistPort schedules;
+    private final PrerequisiteService prerequisites;
 
     public CatalogServiceImpl(CoursePersistPort courses,
                               SectionPersistPort sections,
                               InstructorPersistPort instructors,
-                              ClassSchedulePersistPort schedules) {
+                              ClassSchedulePersistPort schedules,
+                              PrerequisiteService prerequisites) {
+        this.prerequisites = prerequisites;
         this.courses = courses;
         this.sections = sections;
         this.instructors = instructors;
@@ -69,6 +73,7 @@ public class CatalogServiceImpl implements CatalogService {
                         Collectors.mapping(cs -> new ClassSlotView(cs.getDayOfWeek(), cs.getStartTime(),
                                 cs.getEndTime(), cs.getRoomId()), Collectors.toList())));
 
+        Map<String, List<String>> prerequisitesByCourse = prerequisites.all();
         LocalDate today = LocalDate.now();
         List<CatalogSectionView> rows = active.stream()
                 .map(s -> {
@@ -93,7 +98,8 @@ public class CatalogServiceImpl implements CatalogService {
                             seatsLeft,
                             s.getRegistrationDeadline(),
                             beforeDeadline && seatsLeft > 0,
-                            slotsBySection.getOrDefault(s.getSectionId(), List.of()));
+                            slotsBySection.getOrDefault(s.getSectionId(), List.of()),
+                            prerequisitesByCourse.getOrDefault(s.getCourseId(), List.of()));
                 })
                 .sorted(Comparator.comparing(CatalogSectionView::courseId).thenComparing(CatalogSectionView::sectionId))
                 .toList();

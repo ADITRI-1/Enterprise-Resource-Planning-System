@@ -24,6 +24,20 @@ public final class GradeScale {
         return "F";
     }
 
+    /** Grade points on a 10-point scale, used for SGPA/CGPA. */
+    public static int pointsFor(String letter) {
+        return switch (letter == null ? "" : letter) {
+            case "A" -> 10;
+            case "A-" -> 9;
+            case "B" -> 8;
+            case "B-" -> 7;
+            case "C" -> 6;
+            case "C-" -> 5;
+            case "D" -> 4;
+            default -> 0;
+        };
+    }
+
     /** All letters from best to worst, ending with F. */
     public static List<String> letters() {
         List<String> all = new ArrayList<>(List.of(LETTERS));

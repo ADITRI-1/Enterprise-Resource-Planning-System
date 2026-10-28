@@ -24,6 +24,21 @@ export function useStudentGrades(uid: string) {
   });
 }
 
+export function useAcademicRecord(uid: string) {
+  return useQuery({
+    queryKey: ["student", uid, "record"],
+    queryFn: () => api<Schemas["AcademicRecordView"]>(`/api/student/${uid}/academic-record`),
+  });
+}
+
+/** Courses passed so far (final grade other than F), for checking prerequisites in the catalog. */
+export function usePassedCourses(uid: string) {
+  const record = useAcademicRecord(uid);
+  return new Set(
+    (record.data?.terms ?? []).flatMap((t) => t.courses ?? []).filter((c) => c.grade && c.grade !== "F").map((c) => c.courseId!),
+  );
+}
+
 /** Register / drop; refreshes everything that shows seats or enrollments. */
 export function useEnrollmentAction(uid: string, action: "register" | "drop") {
   const qc = useQueryClient();
@@ -32,6 +47,7 @@ export function useEnrollmentAction(uid: string, action: "register" | "drop") {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["student", uid] });
       qc.invalidateQueries({ queryKey: ["catalog"] });
+      qc.invalidateQueries({ queryKey: ["notifications"] });
     },
   });
 }

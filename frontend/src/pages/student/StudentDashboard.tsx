@@ -4,7 +4,7 @@ import { useStudentProfile, type Session } from "@/lib/session";
 import { useTerm } from "@/lib/term";
 import { DAYS, hhmm, minutes, termLabel } from "@/lib/utils";
 import { Card, CardHeader, EmptyState, PageHeader, Spinner, StatCard } from "@/components/ui/misc";
-import { useRegistrations, useStudentGrades, useStudentTimetable } from "./queries";
+import { useAcademicRecord, useRegistrations, useStudentTimetable } from "./queries";
 
 export function StudentDashboard({ session }: { session: Session }) {
   const uid = session.userId;
@@ -12,11 +12,10 @@ export function StudentDashboard({ session }: { session: Session }) {
   const profile = useStudentProfile();
   const registrations = useRegistrations(uid, term);
   const timetable = useStudentTimetable(uid, term);
-  const grades = useStudentGrades(uid);
+  const record = useAcademicRecord(uid);
 
   const active = registrations.data?.filter((r) => r.status === "enrolled") ?? [];
   const credits = active.reduce((sum, r) => sum + (r.credits ?? 0), 0);
-  const finals = grades.data?.filter((g) => g.component === "FINAL") ?? [];
 
   const todayIndex = (new Date().getDay() + 6) % 7; // Monday = 0
   const nowMinutes = new Date().getHours() * 60 + new Date().getMinutes();
@@ -34,7 +33,7 @@ export function StudentDashboard({ session }: { session: Session }) {
         <StatCard label="Registered courses" value={active.length} icon={<Layers className="h-5 w-5" />} hint={termLabel(term)} />
         <StatCard label="Credits" value={credits} icon={<BookOpen className="h-5 w-5" />} tone="accent" />
         <StatCard label="Classes today" value={today.length} icon={<CalendarClock className="h-5 w-5" />} tone="warning" hint={DAYS[todayIndex].charAt(0) + DAYS[todayIndex].slice(1).toLowerCase()} />
-        <StatCard label="Final grades out" value={finals.length} icon={<GraduationCap className="h-5 w-5" />} tone="success" />
+        <StatCard label="CGPA" value={record.data?.cgpa?.toFixed(2) ?? "—"} icon={<GraduationCap className="h-5 w-5" />} tone="success" hint={`${record.data?.creditsEarned ?? 0} credits earned`} />
       </div>
 
       <div className="mt-6 grid gap-6 lg:grid-cols-5">

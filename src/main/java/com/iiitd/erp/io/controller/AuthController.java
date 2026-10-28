@@ -5,6 +5,7 @@ import com.iiitd.erp.core.service.AccountService;
 import com.iiitd.erp.core.service.AuthSessionService;
 import com.iiitd.erp.exception.ErrorCode;
 import com.iiitd.erp.exception.ErpException;
+import com.iiitd.erp.io.controller.support.AuditInterceptor;
 import com.iiitd.erp.io.controller.support.CurrentUser;
 import com.iiitd.erp.io.dto.request.ChangePasswordRequest;
 import com.iiitd.erp.io.dto.request.LoginRequest;
@@ -40,6 +41,7 @@ public class AuthController {
             description = "Returns 401 with details.remainingAttempts on a wrong password and 423 once the account is "
                     + "locked. When mustChangePassword is true, only /api/auth/** works until the password is changed.")
     public LoginResponse login(@RequestBody @Valid LoginRequest body, HttpServletRequest request) {
+        request.setAttribute(AuditInterceptor.ACTOR_ATTRIBUTE, body.username());
         AuthResultDomain result = authSessionService.loginAndCreateSession(
                 body.username(), body.password(), body.role(), request);
         return DOMAIN_TO_RESPONSE_MAPPER_INSTANCE.domainToLoginResponse(result).withMessage("Login Successful");
@@ -68,6 +70,7 @@ public class AuthController {
     @PostMapping("/logout")
     @Operation(summary = "End the session")
     public Map<String, String> logout(HttpServletRequest request) {
+        request.setAttribute(AuditInterceptor.ACTOR_ATTRIBUTE, currentUser.username());
         var session = request.getSession(false);
         if (session != null) {
             session.invalidate();

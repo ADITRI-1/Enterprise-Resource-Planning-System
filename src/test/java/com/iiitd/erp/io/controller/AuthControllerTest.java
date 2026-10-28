@@ -6,7 +6,9 @@ import com.iiitd.erp.core.service.MaintenanceService;
 import com.iiitd.erp.exception.ErrorCode;
 import com.iiitd.erp.exception.ErpException;
 import com.iiitd.erp.core.service.AccountService;
+import com.iiitd.erp.io.controller.support.AuditInterceptor;
 import com.iiitd.erp.io.controller.support.CurrentUser;
+import com.iiitd.erp.persistent.persistence.repository.AuditRepository;
 import com.iiitd.erp.io.controller.support.MaintenanceReadOnlyInterceptor;
 import com.iiitd.erp.io.controller.support.PasswordChangeRequiredInterceptor;
 import org.junit.jupiter.api.Test;
@@ -32,7 +34,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(AuthController.class)
-@Import({MaintenanceReadOnlyInterceptor.class, PasswordChangeRequiredInterceptor.class})
+@Import({MaintenanceReadOnlyInterceptor.class, PasswordChangeRequiredInterceptor.class, AuditInterceptor.class})
 @AutoConfigureMockMvc(addFilters = false)
 class AuthControllerTest {
 
@@ -42,6 +44,7 @@ class AuthControllerTest {
     @MockitoBean MaintenanceService maintenanceService;
     @MockitoBean AccountService accountService;
     @MockitoBean CurrentUser currentUser;
+    @MockitoBean AuditRepository auditRepository;
 
     @Test
     void login_success() throws Exception {

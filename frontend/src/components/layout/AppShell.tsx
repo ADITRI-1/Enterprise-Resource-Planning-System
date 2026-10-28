@@ -7,6 +7,7 @@ import { useTheme } from "@/lib/theme";
 import { Avatar } from "@/components/ui/misc";
 import { Button } from "@/components/ui/button";
 import { NAV } from "./nav";
+import { NotificationBell } from "./NotificationBell";
 
 export function BrandMark({ className }: { className?: string }) {
   return (
@@ -135,6 +136,7 @@ export function AppShell({ session, children }: { session: Session; children: Re
             <Button variant="ghost" size="icon" className="text-white/90 hover:bg-white/10 hover:text-white" onClick={toggle} aria-label={dark ? "Switch to light mode" : "Switch to dark mode"}>
               {dark ? <Sun className="h-5 w-5" /> : <Moon className="h-5 w-5" />}
             </Button>
+            <NotificationBell />
             <UserMenu session={session} name={name} />
           </div>
         </div>

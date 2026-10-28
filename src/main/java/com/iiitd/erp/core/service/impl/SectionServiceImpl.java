@@ -2,6 +2,8 @@ package com.iiitd.erp.core.service.impl;
 
 import com.iiitd.erp.Domain.*;
 import com.iiitd.erp.core.*;
+import com.iiitd.erp.core.service.NotificationService;
+import com.iiitd.erp.core.service.PrerequisiteService;
 import com.iiitd.erp.core.service.SectionService;
 import com.iiitd.erp.core.service.support.SemesterTerm;
 import com.iiitd.erp.exception.ErrorCode;
@@ -36,6 +38,8 @@ public class SectionServiceImpl implements SectionService {
     private final AssessmentComponentPersistPort components;
     private final AssessmentScorePersistPort scores;
     private final GradeRepository grades;
+    private final PrerequisiteService prerequisites;
+    private final NotificationService notifications;
 
     public SectionServiceImpl(SectionPersistPort sections,
                               CoursePersistPort courses,
@@ -46,7 +50,11 @@ public class SectionServiceImpl implements SectionService {
                               RoomPersistPort rooms,
                               AssessmentComponentPersistPort components,
                               AssessmentScorePersistPort scores,
-                              GradeRepository grades) {
+                              GradeRepository grades,
+                              PrerequisiteService prerequisites,
+                              NotificationService notifications) {
+        this.prerequisites = prerequisites;
+        this.notifications = notifications;
         this.sections = sections;
         this.courses = courses;
         this.instructors = instructors;
@@ -196,6 +204,8 @@ public class SectionServiceImpl implements SectionService {
         if (existing.filter(e -> EnrollmentDomain.ENROLLED.equalsIgnoreCase(e.getStatus())).isPresent()) {
             throw ErpException.of(ErrorCode.ALREADY_ENROLLED, Map.of("sectionId", sectionId));
         }
+        ensurePrerequisites(studentId, section);
+        ensureNoTimetableClash(studentId, section);
         ensureCapacity(sectionId, section.getCapacity());
 
         // (student, section) is unique, so a previously dropped enrollment is reactivated.
@@ -213,6 +223,11 @@ public class SectionServiceImpl implements SectionService {
                         .build());
         enrollments.save(enrollment);
         syncSectionCount(section);
+        notifications.notify(studentId, NotificationService.REGISTRATION,
+                "Registered for " + section.getCourseId(),
+                "You're registered in section " + sectionId + ". You can drop it until "
+                        + section.getRegistrationDeadline() + ".",
+                "/student/registrations");
 
         return RegistrationOutcomeDomain.builder().status("OK").message("Registered successfully").build();
     }
@@ -232,6 +247,10 @@ public class SectionServiceImpl implements SectionService {
 
         enrollments.save(enrollment.toBuilder().status(EnrollmentDomain.DROPPED).build());
         syncSectionCount(section);
+        notifications.notify(studentId, NotificationService.REGISTRATION,
+                "Dropped " + section.getCourseId(),
+                "You're no longer registered in section " + sectionId + ".",
+                "/student/registrations");
         return true;
     }
 
@@ -386,6 +405,48 @@ public class SectionServiceImpl implements SectionService {
         if (section.getRegistrationDeadline() != null && today.isAfter(section.getRegistrationDeadline())) {
             throw ErpException.of(ErrorCode.REGISTRATION_DEADLINE_PASSED,
                     Map.of("sectionId", section.getSectionId(), "deadline", section.getRegistrationDeadline()));
+        }
+    }
+
+    private void ensurePrerequisites(UUID studentId, SectionDomain section) {
+        List<String> missing = prerequisites.missingFor(studentId, section.getCourseId());
+        if (!missing.isEmpty()) {
+            throw ErpException.of(ErrorCode.PREREQUISITE_NOT_MET,
+                    Map.of("courseId", section.getCourseId(), "missing", missing));
+        }
+    }
+
+    /** Rejects the section if any of its slots overlaps a class the student already has that term. */
+    private void ensureNoTimetableClash(UUID studentId, SectionDomain target) {
+        List<ClassScheduleDomain> targetSlots = schedules.findBySectionId(target.getSectionId());
+        if (targetSlots.isEmpty()) {
+            return;
+        }
+        Map<String, SectionDomain> sameTerm = enrollments.findByStudentAndStatus(studentId, EnrollmentDomain.ENROLLED).stream()
+                .map(EnrollmentDomain::getSectionId)
+                .filter(id -> !id.equals(target.getSectionId()))
+                .map(sections::findBySectionId)
+                .filter(Objects::nonNull)
+                .filter(s -> Objects.equals(s.getYear(), target.getYear())
+                        && Objects.equals(s.getSemester(), target.getSemester()))
+                .collect(Collectors.toMap(SectionDomain::getSectionId, s -> s));
+        if (sameTerm.isEmpty()) {
+            return;
+        }
+        for (ClassScheduleDomain existing : schedules.findBySectionIds(new ArrayList<>(sameTerm.keySet()))) {
+            for (ClassScheduleDomain wanted : targetSlots) {
+                boolean overlaps = wanted.getDayOfWeek() == existing.getDayOfWeek()
+                        && wanted.getStartTime().isBefore(existing.getEndTime())
+                        && existing.getStartTime().isBefore(wanted.getEndTime());
+                if (overlaps) {
+                    throw ErpException.of(ErrorCode.TIMETABLE_CLASH, Map.of(
+                            "conflictsWith", sameTerm.get(existing.getSectionId()).getCourseId(),
+                            "sectionId", existing.getSectionId(),
+                            "day", existing.getDayOfWeek(),
+                            "start", existing.getStartTime().toString(),
+                            "end", existing.getEndTime().toString()));
+                }
+            }
         }
     }
 

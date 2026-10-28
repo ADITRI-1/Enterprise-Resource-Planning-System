@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, Search } from "lucide-react";
+import { AlertTriangle, ArrowDown, ArrowUp, ArrowUpDown, ChevronLeft, ChevronRight, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
-import type { Page } from "@/lib/api";
+import { errorMessage, type Page } from "@/lib/api";
 import { Button } from "./button";
 import { EmptyState, Spinner } from "./misc";
 
@@ -38,9 +38,11 @@ type TableProps<T> = {
   sort?: string;
   onSort?: (key: string) => void;
   rowClassName?: (row: T) => string | undefined;
+  error?: unknown;
 };
 
-export function Table<T>({ columns, rows, rowKey, loading, empty, sort, onSort, rowClassName }: TableProps<T>) {
+export function Table<T>({ columns, rows, rowKey, loading, empty, sort, onSort, rowClassName, error }: TableProps<T>) {
+  if (error && !rows) return <EmptyState icon={<AlertTriangle className="h-6 w-6 text-danger" />} title="Couldn't load this list" description={errorMessage(error)} />;
   if (loading && !rows) return <Spinner />;
   if (!rows?.length) return <EmptyState title={empty?.title ?? "Nothing here yet"} description={empty?.description} />;
   return (

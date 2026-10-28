@@ -1,7 +1,9 @@
 package com.iiitd.erp.io.controller;
 
+import com.iiitd.erp.Domain.AcademicRecordView;
 import com.iiitd.erp.Domain.RegistrationView;
 import com.iiitd.erp.Domain.StudentUserDomain;
+import com.iiitd.erp.core.service.AcademicRecordService;
 import com.iiitd.erp.core.service.SectionService;
 import com.iiitd.erp.core.service.StudentService;
 import com.iiitd.erp.exception.ErrorCode;
@@ -37,9 +39,12 @@ public class StudentController {
     private final SectionService sections;
     private final StudentService students;
     private final CurrentUser currentUser;
+    private final AcademicRecordService academicRecords;
     private final DomainToResponseMapper mapper = DomainToResponseMapper.DOMAIN_TO_RESPONSE_MAPPER_INSTANCE;
 
-    public StudentController(SectionService sections, StudentService students, CurrentUser currentUser) {
+    public StudentController(SectionService sections, StudentService students, CurrentUser currentUser,
+                             AcademicRecordService academicRecords) {
+        this.academicRecords = academicRecords;
         this.sections = sections;
         this.students = students;
         this.currentUser = currentUser;
@@ -97,6 +102,23 @@ public class StudentController {
         return sections.gradesForStudent(uid).stream()
                 .map(mapper::studentGradeDomainToResponse)
                 .toList();
+    }
+
+    @GetMapping("/{uid}/academic-record")
+    @Operation(summary = "Results by term with SGPA and CGPA (10-point scale)")
+    public AcademicRecordView academicRecord(@PathVariable String uid) {
+        currentUser.requireStudent(uid);
+        return academicRecords.record(uid);
+    }
+
+    @GetMapping("/{uid}/transcript.pdf")
+    @Operation(summary = "Download transcript as PDF")
+    public ResponseEntity<byte[]> transcriptPdf(@PathVariable String uid) {
+        currentUser.requireStudent(uid);
+        return ResponseEntity.ok()
+                .contentType(MediaType.APPLICATION_PDF)
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=transcript-" + uid + ".pdf")
+                .body(academicRecords.transcriptPdf(uid));
     }
 
     @GetMapping({"/{uid}/transcript.csv", "/{uid}/transcript/download"})

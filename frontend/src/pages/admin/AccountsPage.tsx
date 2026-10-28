@@ -72,7 +72,8 @@ export function AccountsPage() {
           <SearchInput value={list.state.q} onChange={list.setSearch} placeholder="Search username or role" />
           <p className="text-sm text-fg-muted">{accounts.data?.totalItems ?? 0} accounts</p>
         </div>
-        <Table columns={columns} rows={accounts.data?.items} rowKey={(a) => a.userId!} loading={accounts.isFetching} sort={list.state.sort} onSort={list.toggleSort} />
+        <Table columns={columns} rows={accounts.data?.items} rowKey={(a) => a.userId!} loading={accounts.isFetching}
+          error={accounts.error} sort={list.state.sort} onSort={list.toggleSort} />
         <Pagination page={accounts.data} onPage={list.setPage} />
       </Card>
       <ConfirmDialog

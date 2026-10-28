@@ -30,23 +30,56 @@ Open http://localhost:5173 and use a demo account (buttons on the login page). T
 database lives in `target/dev-postgres`; delete it to start over from the seed data.
 To run against your own PostgreSQL instead, see *How to Run the Backend* below.
 
+## Run with Docker
+
+    docker compose up --build
+
+Then open http://localhost:3000 (API on :8080). This runs PostgreSQL 16, the Spring Boot API and the
+web app behind nginx. Schema and demo data are created on first start. Set `DB_PASSWORD` (environment
+or a `.env` file) before using it anywhere but your own machine.
+
+## Features
+
+**Students**: dashboard with CGPA and today's classes, course catalog (live seats, schedule,
+prerequisites with ✓/✗), register / drop, weekly timetable, grades with SGPA/CGPA by term,
+transcript as PDF or CSV.
+
+**Instructors**: inline gradebook with CSV import/export, assessment weights (must total 100%),
+compute final grades, class statistics with grade distribution.
+
+**Admins**: dashboard and maintenance switch, analytics (section fill, grade distribution,
+enrollments by department, daily registrations), audit log, accounts (unlock / reset password),
+create/edit/delete for students, instructors, courses (with prerequisites), sections (with a
+schedule editor that only offers free rooms), rooms, departments and programs.
+
+**Rules enforced by the API**: capacity (with row locking), duplicates, deadlines, prerequisites
+(passed = any final grade but F, cycles rejected), timetable clashes, instructor owns the section,
+maintenance mode read-only, password policy + history, lockout after 5 failed logins.
+
+**Everyone**: notification bell (registration, grades published, maintenance), maintenance
+banner, forced password change after a temporary password, dark mode, phone layouts.
+
+Grades: total = Σ(score ÷ out of × weight) × 100 → A ≥ 90, A- ≥ 80, B ≥ 70, B- ≥ 60, C ≥ 50,
+C- ≥ 40, D ≥ 30, else F. Grade points A 10, A- 9, B 8, B- 7, C 6, C- 5, D 4, F 0;
+SGPA/CGPA = Σ(points × credits) ÷ Σ credits over graded courses.
+
 ## Frontend
 
 React 18, TypeScript, Vite, Tailwind CSS, TanStack Query, React Router, Recharts.
 
-* **Students**: dashboard, course catalog with live seats and register, my registrations with
-  drop, weekly timetable, grades with transcript CSV.
-* **Instructors**: sections, inline gradebook with CSV import/export, assessment weights,
-  compute final grades, class statistics and grade distribution chart.
-* **Admins**: dashboard and maintenance switch, accounts (unlock / reset password), full
-  create/edit/delete for students, instructors, courses, sections (with a weekly schedule editor
-  that only offers free rooms), rooms, departments and programs.
-* Maintenance banner for everyone, forced password change after a temporary password,
-  dark mode, and layouts that work on phones.
-
 The dev server proxies `/api` to `localhost:8080`, so the session cookie stays same-origin.
 API types in `frontend/src/api/schema.d.ts` are generated from the backend's OpenAPI spec:
 run `npm run gen:api` while the backend is running after changing the API.
+
+## Tests
+
+    ./mvnw test                      # backend: unit + integration tests on embedded PostgreSQL
+    cd frontend
+    npx playwright install chromium  # once
+    npm run test:e2e                 # browser tests; starts its own backend (:8081) and web app (:5174)
+
+The browser tests use a fresh database each run, so they never touch your dev data. GitHub Actions
+(`.github/workflows/ci.yml`) runs all of these plus `docker compose build` on every push.
 
 ## Tech Stack
 

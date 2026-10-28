@@ -18,4 +18,5 @@ public record CatalogSectionView(String sectionId,
                                  int seatsLeft,
                                  LocalDate registrationDeadline,
                                  boolean open,
-                                 List<ClassSlotView> schedule) {}
+                                 List<ClassSlotView> schedule,
+                                 List<String> prerequisites) {}

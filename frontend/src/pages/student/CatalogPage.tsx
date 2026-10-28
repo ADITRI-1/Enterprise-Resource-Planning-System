@@ -10,7 +10,7 @@ import { Badge, Card, PageHeader } from "@/components/ui/misc";
 import { ConfirmDialog } from "@/components/ui/modal";
 import { Pagination, SearchInput, Table, useListState, type Column } from "@/components/ui/table";
 import { TermPicker } from "@/components/TermPicker";
-import { useEnrollmentAction, useRegistrations } from "./queries";
+import { useEnrollmentAction, usePassedCourses, useRegistrations } from "./queries";
 
 type Row = Schemas["CatalogSectionView"];
 
@@ -42,6 +42,8 @@ export function CatalogPage({ session }: { session: Session }) {
   const mine = useRegistrations(uid, term);
   const enrolledIn = new Set(mine.data?.filter((r) => r.status === "enrolled").map((r) => r.sectionId));
   const register = useEnrollmentAction(uid, "register");
+  const passed = usePassedCourses(uid);
+  const missingFor = (r: Row) => (r.prerequisites ?? []).filter((p) => !passed.has(p));
 
   const columns: Column<Row>[] = [
     {
@@ -50,6 +52,16 @@ export function CatalogPage({ session }: { session: Session }) {
         <div className="min-w-[180px]">
           <p className="font-medium">{r.courseId} · {r.title}</p>
           <p className="text-xs text-fg-muted">{r.credits} credits · {r.deptId}<span className="md:hidden"> · {r.seatsLeft} seats left</span></p>
+          {!!r.prerequisites?.length && (
+            <p className="mt-1 flex flex-wrap items-center gap-1 text-xs text-fg-muted">
+              Requires
+              {r.prerequisites.map((p) => (
+                <span key={p} className={passed.has(p) ? "font-medium text-success" : "font-medium text-warning"}>
+                  {passed.has(p) ? "✓" : "✗"} {p}
+                </span>
+              ))}
+            </p>
+          )}
         </div>
       ),
     },
@@ -71,6 +83,7 @@ export function CatalogPage({ session }: { session: Session }) {
       cell: (r) =>
         enrolledIn.has(r.sectionId) ? <Badge tone="success">Registered</Badge>
           : !r.open ? <Badge tone={r.seatsLeft === 0 ? "danger" : "neutral"}>{r.seatsLeft === 0 ? "Full" : "Closed"}</Badge>
+          : missingFor(r).length ? <Badge tone="warning">Needs {missingFor(r).join(", ")}</Badge>
           : <Button size="sm" disabled={maintenance} onClick={() => setConfirm(r)}>Register</Button>,
     },
   ];
@@ -88,6 +101,7 @@ export function CatalogPage({ session }: { session: Session }) {
           rows={catalog.data?.items}
           rowKey={(r) => r.sectionId!}
           loading={catalog.isFetching}
+          error={catalog.error}
           sort={list.state.sort}
           onSort={list.toggleSort}
           empty={{ title: "No sections found", description: "Try another term or search." }}

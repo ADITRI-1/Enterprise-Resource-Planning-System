@@ -75,7 +75,13 @@ export async function download(path: string, fallbackName: string) {
 
 export function errorMessage(err: unknown) {
   if (err instanceof ApiError) {
-    const reason = typeof err.details.reason === "string" ? `: ${err.details.reason}` : "";
+    const d = err.details;
+    if (Array.isArray(d.missing)) return `${err.message}: you still need ${d.missing.join(", ")}`;
+    if (typeof d.conflictsWith === "string") {
+      const day = typeof d.day === "string" ? d.day.charAt(0) + d.day.slice(1).toLowerCase() : "";
+      return `Clashes with ${d.conflictsWith} on ${day} ${String(d.start).slice(0, 5)}–${String(d.end).slice(0, 5)}`;
+    }
+    const reason = typeof d.reason === "string" ? `: ${d.reason}` : "";
     return err.message + reason;
   }
   return err instanceof Error ? err.message : "Something went wrong";

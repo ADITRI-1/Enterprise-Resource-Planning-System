@@ -1,4 +1,9 @@
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { GitBranch } from "lucide-react";
+import { api } from "@/lib/api";
+import { Button } from "@/components/ui/button";
+import { PrerequisitesDialog } from "./PrerequisitesDialog";
 import type { Schemas } from "@/lib/api";
 import { formatDate } from "@/lib/utils";
 import { CrudPage, useOptions, type CrudConfig } from "./CrudPage";
@@ -97,6 +102,9 @@ export function InstructorsPage() {
 
 export function CoursesPage() {
   const departments = useOptions<Schemas["DepartmentResponse"]>("/api/admin/departments", (d) => ({ value: d.deptId!, label: `${d.deptId} · ${d.deptDesc}` }));
+  const allCourses = useOptions<Schemas["CourseResponse"]>("/api/admin/courses", (c) => ({ value: c.courseId!, label: `${c.courseId} · ${c.title}` }));
+  const prereqs = useQuery({ queryKey: ["admin", "prerequisites"], queryFn: () => api<Record<string, string[]>>("/api/admin/prerequisites") });
+  const [editingPrereqs, setEditingPrereqs] = useState<string | null>(null);
   const config: CrudConfig<Schemas["CourseResponse"]> = {
     title: "Courses",
     singular: "Course",
@@ -112,7 +120,18 @@ export function CoursesPage() {
       { key: "title", header: "Title", sortable: true },
       { key: "deptId", header: "Department", sortable: true, hideOnMobile: true },
       { key: "credits", header: "Credits", sortable: true },
+      {
+        key: "prereqs", header: "Requires", hideOnMobile: true,
+        cell: (r) => prereqs.data?.[r.courseId!]?.length
+          ? <span className="text-xs">{prereqs.data[r.courseId!].join(", ")}</span>
+          : <span className="text-xs text-fg-muted">—</span>,
+      },
     ],
+    rowActions: (r) => (
+      <Button variant="ghost" size="icon" onClick={() => setEditingPrereqs(r.courseId!)} aria-label={`Prerequisites for ${r.courseId}`}>
+        <GitBranch className="h-4 w-4" />
+      </Button>
+    ),
     fields: [
       { name: "courseId", label: "Course code", required: true, createOnly: true, placeholder: "CSE102" },
       { name: "title", label: "Title", required: true },
@@ -122,7 +141,12 @@ export function CoursesPage() {
     toForm: (r) => ({ courseId: r.courseId ?? "", title: r.title ?? "", deptId: r.deptId ?? "", credits: String(r.credits ?? "") }),
     toBody: (f) => ({ courseId: f.courseId, title: f.title, deptId: f.deptId, credits: num(f.credits) }),
   };
-  return <CrudPage config={config} />;
+  return (
+    <>
+      <CrudPage config={config} />
+      {editingPrereqs && <PrerequisitesDialog courseId={editingPrereqs} courses={allCourses} onClose={() => setEditingPrereqs(null)} />}
+    </>
+  );
 }
 
 export function DepartmentsPage() {

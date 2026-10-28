@@ -25,6 +25,8 @@ const SectionPage = lazyPage(() => import("@/pages/instructor/SectionPage"), "Se
 const InstructorTimetablePage = lazyPage(() => import("@/pages/instructor/TimetablePage"), "InstructorTimetablePage");
 const AdminDashboard = lazyPage(() => import("@/pages/admin/AdminDashboard"), "AdminDashboard");
 const AccountsPage = lazyPage(() => import("@/pages/admin/AccountsPage"), "AccountsPage");
+const AnalyticsPage = lazyPage(() => import("@/pages/admin/AnalyticsPage"), "AnalyticsPage");
+const AuditPage = lazyPage(() => import("@/pages/admin/AuditPage"), "AuditPage");
 const SectionsPage = lazyPage(() => import("@/pages/admin/SectionsPage"), "SectionsPage");
 const CoursesPage = lazyPage(() => import("@/pages/admin/resources"), "CoursesPage");
 const DepartmentsPage = lazyPage(() => import("@/pages/admin/resources"), "DepartmentsPage");
@@ -99,6 +101,8 @@ export default function App() {
           <Route path="/instructor/timetable" element={<Only role="instructor" session={session}><InstructorTimetablePage /></Only>} />
 
           <Route path="/admin" element={<Only role="admin" session={session}><AdminDashboard /></Only>} />
+          <Route path="/admin/analytics" element={<Only role="admin" session={session}><AnalyticsPage /></Only>} />
+          <Route path="/admin/audit" element={<Only role="admin" session={session}><AuditPage /></Only>} />
           <Route path="/admin/accounts" element={<Only role="admin" session={session}><AccountsPage /></Only>} />
           <Route path="/admin/students" element={<Only role="admin" session={session}><StudentsPage /></Only>} />
           <Route path="/admin/instructors" element={<Only role="admin" session={session}><InstructorsPage /></Only>} />

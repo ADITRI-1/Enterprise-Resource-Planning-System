@@ -4,6 +4,7 @@ import com.iiitd.erp.Domain.*;
 import com.iiitd.erp.core.AssessmentScorePersistPort;
 import com.iiitd.erp.core.SectionPersistPort;
 import com.iiitd.erp.core.service.AssessmentService;
+import com.iiitd.erp.core.service.NotificationService;
 import com.iiitd.erp.core.service.ScoreService;
 import com.iiitd.erp.core.service.support.GradeScale;
 import com.iiitd.erp.exception.ErpException;
@@ -41,12 +42,15 @@ public class ScoreServiceImpl implements ScoreService {
     private final AssessmentScorePersistPort scores;
     private final EnrollmentRepository enrollmentRepository;
     private final GradeRepository grades;
+    private final NotificationService notifications;
 
     public ScoreServiceImpl(SectionPersistPort sections,
                             AssessmentService assessmentService,
                             AssessmentScorePersistPort scores,
                             EnrollmentRepository enrollmentRepository,
-                            GradeRepository grades) {
+                            GradeRepository grades,
+                            NotificationService notifications) {
+        this.notifications = notifications;
         this.sections = sections;
         this.assessmentService = assessmentService;
         this.scores = scores;
@@ -167,6 +171,11 @@ public class ScoreServiceImpl implements ScoreService {
             grade.setWeightedScore(total);
             grade.setFinalGrade(letter);
             grades.save(grade);
+
+            notifications.notify(student.getStudentId(), NotificationService.GRADES,
+                    "Final grade published for " + overview.getSection().getCourseId(),
+                    "Your final grade is " + letter + " (" + total.toPlainString() + " / 100).",
+                    "/student/grades");
 
             results.add(FinalGradeDomain.builder()
                     .enrollmentId(student.getEnrollmentId())

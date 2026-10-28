@@ -4,6 +4,10 @@ import com.iiitd.erp.Domain.*;
 import com.iiitd.erp.core.service.*;
 import com.iiitd.erp.core.service.dto.SectionScheduleResult;
 import com.iiitd.erp.io.controller.support.Paging;
+import com.iiitd.erp.persistent.entity.erp_db.AuditEntry;
+import com.iiitd.erp.persistent.persistence.repository.AuditRepository;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import com.iiitd.erp.io.dto.request.*;
 import com.iiitd.erp.io.dto.response.*;
 import io.swagger.v3.oas.annotations.Operation;
@@ -51,6 +55,9 @@ public class AdminController {
     private final AccountService accountService;
     private final DashboardService dashboardService;
     private final Paging paging;
+    private final PrerequisiteService prerequisiteService;
+    private final AnalyticsService analyticsService;
+    private final AuditRepository auditRepository;
 
     public AdminController(StudentService studentService,
                            InstructorService instructorService,
@@ -65,7 +72,13 @@ public class AdminController {
                            TimetableService timetableService,
                            AccountService accountService,
                            DashboardService dashboardService,
-                           Paging paging) {
+                           Paging paging,
+                           PrerequisiteService prerequisiteService,
+                           AnalyticsService analyticsService,
+                           AuditRepository auditRepository) {
+        this.prerequisiteService = prerequisiteService;
+        this.analyticsService = analyticsService;
+        this.auditRepository = auditRepository;
         this.studentService = studentService;
         this.instructorService = instructorService;
         this.programService = programService;
@@ -88,6 +101,26 @@ public class AdminController {
     @Operation(summary = "Counts for the admin home page")
     public DashboardView dashboard() {
         return dashboardService.adminDashboard();
+    }
+
+    @GetMapping("/analytics")
+    @Operation(summary = "Section fill, enrollments by department, grade distribution, daily registrations")
+    public AnalyticsView analytics(@RequestParam(required = false) String semester,
+                                   @RequestParam(required = false) Integer year) {
+        return analyticsService.adminAnalytics(semester, year);
+    }
+
+    @GetMapping("/audit")
+    @Operation(summary = "Audit log of every change and login attempt, newest first",
+            description = "q matches actor or path. Paged in the database.")
+    public PageResponse<AuditEntryResponse> audit(@RequestParam(required = false) String q,
+                                                  @RequestParam(defaultValue = "0") int page,
+                                                  @RequestParam(defaultValue = "25") int size) {
+        Page<AuditEntry> rows = auditRepository.search(q == null ? "" : q.trim(),
+                PageRequest.of(Math.max(page, 0), Math.min(Math.max(size, 1), ListParams.MAX_SIZE)));
+        return new PageResponse<>(rows.map(a -> new AuditEntryResponse(a.getAuditId(), a.getAt(), a.getActor(), a.getRole(),
+                        a.getMethod(), a.getPath(), a.getStatus(), a.getIp())).getContent(),
+                rows.getNumber(), rows.getSize(), rows.getTotalElements(), rows.getTotalPages());
     }
 
     // ----- Login accounts -----
@@ -257,6 +290,23 @@ public class AdminController {
     @DeleteMapping("/courses/{courseId}")
     public Map<String, Object> deleteCourse(@PathVariable String courseId) {
         return Map.of("deleted", courseService.deleteCourse(courseId), "courseId", courseId);
+    }
+
+    @GetMapping("/prerequisites")
+    @Operation(summary = "Every course's prerequisites (courseId -> required course ids)")
+    public Map<String, List<String>> allPrerequisites() {
+        return prerequisiteService.all();
+    }
+
+    @GetMapping("/courses/{courseId}/prerequisites")
+    public List<String> prerequisites(@PathVariable String courseId) {
+        return prerequisiteService.prerequisitesOf(courseId);
+    }
+
+    @PutMapping("/courses/{courseId}/prerequisites")
+    @Operation(summary = "Replace a course's prerequisites", description = "Rejects unknown courses and circular requirements.")
+    public List<String> replacePrerequisites(@PathVariable String courseId, @RequestBody @Valid PrerequisitesRequest request) {
+        return prerequisiteService.replace(courseId, request.prerequisites());
     }
 
     // ----- Rooms -----

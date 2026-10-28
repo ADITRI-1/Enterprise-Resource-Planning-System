@@ -190,6 +190,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/courses/{courseId}/prerequisites": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["prerequisites"];
+        /**
+         * Replace a course's prerequisites
+         * @description Rejects unknown courses and circular requirements.
+         */
+        put: operations["replacePrerequisites"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/student/{uid}/register": {
         parameters: {
             query?: never;
@@ -221,6 +241,38 @@ export interface paths {
         put?: never;
         /** Drop a section (before its deadline) */
         post: operations["drop"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/notifications/{id}/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["markRead"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/notifications/read-all": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["markAllRead"];
         delete?: never;
         options?: never;
         head?: never;
@@ -552,6 +604,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/student/{uid}/transcript.pdf": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Download transcript as PDF */
+        get: operations["transcriptPdf"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/student/{uid}/timetable": {
         parameters: {
             query?: never;
@@ -609,6 +678,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/student/{uid}/academic-record": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Results by term with SGPA and CGPA (10-point scale) */
+        get: operations["academicRecord"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/student/me": {
         parameters: {
             query?: never;
@@ -618,6 +704,40 @@ export interface paths {
         };
         /** Logged-in student's profile (includes the userId used in other student URLs) */
         get: operations["me"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/notifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** My notifications, newest first */
+        get: operations["list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/notifications/unread-count": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Number for the bell badge */
+        get: operations["unreadCount"];
         put?: never;
         post?: never;
         delete?: never;
@@ -885,6 +1005,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/prerequisites": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Every course's prerequisites (courseId -> required course ids) */
+        get: operations["allPrerequisites"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/instructors": {
         parameters: {
             query?: never;
@@ -926,6 +1063,43 @@ export interface paths {
         };
         /** Counts for the admin home page */
         get: operations["dashboard"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/audit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Audit log of every change and login attempt, newest first
+         * @description q matches actor or path. Paged in the database.
+         */
+        get: operations["audit"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/analytics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Section fill, enrollments by department, grade distribution, daily registrations */
+        get: operations["analytics"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1131,6 +1305,9 @@ export interface components {
             /** Format: int32 */
             credits?: number;
         };
+        PrerequisitesRequest: {
+            prerequisites: string[];
+        };
         SectionIdRequest: {
             sectionId: string;
         };
@@ -1266,6 +1443,38 @@ export interface components {
             score?: number;
             finalGrade?: string;
         };
+        AcademicRecordView: {
+            studentName?: string;
+            rollNo?: string;
+            programId?: string;
+            terms?: components["schemas"]["TermRecord"][];
+            /** Format: int32 */
+            creditsEarned?: number;
+            /** Format: int32 */
+            creditsGraded?: number;
+            /** Format: double */
+            cgpa?: number;
+        };
+        CourseRecord: {
+            courseId?: string;
+            title?: string;
+            /** Format: int32 */
+            credits?: number;
+            grade?: string;
+            /** Format: int32 */
+            gradePoints?: number;
+            total?: number;
+        };
+        TermRecord: {
+            semester?: string;
+            /** Format: int32 */
+            year?: number;
+            courses?: components["schemas"]["CourseRecord"][];
+            /** Format: int32 */
+            creditsGraded?: number;
+            /** Format: double */
+            sgpa?: number;
+        };
         StudentProfileResponse: {
             /** Format: uuid */
             userId?: string;
@@ -1274,6 +1483,28 @@ export interface components {
             rollNo?: string;
             programId?: string;
             year?: string;
+        };
+        NotificationView: {
+            /** Format: uuid */
+            notificationId?: string;
+            type?: string;
+            title?: string;
+            message?: string;
+            link?: string;
+            /** Format: date-time */
+            createdAt?: string;
+            read?: boolean;
+        };
+        PageResponseNotificationView: {
+            items?: components["schemas"]["NotificationView"][];
+            /** Format: int32 */
+            page?: number;
+            /** Format: int32 */
+            size?: number;
+            /** Format: int64 */
+            totalItems?: number;
+            /** Format: int32 */
+            totalPages?: number;
         };
         InstructorTimetableSlotResponse: {
             sectionId?: string;
@@ -1374,6 +1605,7 @@ export interface components {
             registrationDeadline?: string;
             open?: boolean;
             schedule?: components["schemas"]["ClassSlotView"][];
+            prerequisites?: string[];
         };
         ClassSlotView: {
             /** @enum {string} */
@@ -1562,6 +1794,57 @@ export interface components {
             /** Format: int64 */
             pendingPasswordChanges?: number;
             maintenanceOn?: boolean;
+        };
+        AuditEntryResponse: {
+            /** Format: int64 */
+            id?: number;
+            /** Format: date-time */
+            at?: string;
+            actor?: string;
+            role?: string;
+            method?: string;
+            path?: string;
+            /** Format: int32 */
+            status?: number;
+            ip?: string;
+        };
+        PageResponseAuditEntryResponse: {
+            items?: components["schemas"]["AuditEntryResponse"][];
+            /** Format: int32 */
+            page?: number;
+            /** Format: int32 */
+            size?: number;
+            /** Format: int64 */
+            totalItems?: number;
+            /** Format: int32 */
+            totalPages?: number;
+        };
+        AnalyticsView: {
+            sectionFill?: components["schemas"]["SectionFill"][];
+            enrollmentsByDepartment?: components["schemas"]["DepartmentCount"][];
+            gradeDistribution?: {
+                [key: string]: number;
+            };
+            registrationsByDay?: components["schemas"]["DailyCount"][];
+        };
+        DailyCount: {
+            /** Format: date */
+            date?: string;
+            /** Format: int64 */
+            registrations?: number;
+        };
+        DepartmentCount: {
+            deptId?: string;
+            /** Format: int64 */
+            enrolled?: number;
+        };
+        SectionFill: {
+            sectionId?: string;
+            courseId?: string;
+            /** Format: int32 */
+            enrolled?: number;
+            /** Format: int32 */
+            capacity?: number;
         };
     };
     responses: never;
@@ -2117,6 +2400,54 @@ export interface operations {
             };
         };
     };
+    prerequisites: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                courseId: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": string[];
+                };
+            };
+        };
+    };
+    replacePrerequisites: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                courseId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PrerequisitesRequest"];
+            };
+        };
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": string[];
+                };
+            };
+        };
+    };
     register: {
         parameters: {
             query?: never;
@@ -2166,6 +2497,52 @@ export interface operations {
                 content: {
                     "*/*": {
                         [key: string]: unknown;
+                    };
+                };
+            };
+        };
+    };
+    markRead: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        [key: string]: boolean;
+                    };
+                };
+            };
+        };
+    };
+    markAllRead: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        [key: string]: number;
                     };
                 };
             };
@@ -2779,6 +3156,28 @@ export interface operations {
             };
         };
     };
+    transcriptPdf: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                uid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": string;
+                };
+            };
+        };
+    };
     timetable: {
         parameters: {
             query: {
@@ -2851,6 +3250,28 @@ export interface operations {
             };
         };
     };
+    academicRecord: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                uid: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AcademicRecordView"];
+                };
+            };
+        };
+    };
     me: {
         parameters: {
             query?: never;
@@ -2867,6 +3288,52 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["StudentProfileResponse"];
+                };
+            };
+        };
+    };
+    list: {
+        parameters: {
+            query?: {
+                unreadOnly?: boolean;
+                page?: number;
+                size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PageResponseNotificationView"];
+                };
+            };
+        };
+    };
+    unreadCount: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        [key: string]: number;
+                    };
                 };
             };
         };
@@ -3271,6 +3738,28 @@ export interface operations {
             };
         };
     };
+    allPrerequisites: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        [key: string]: string[];
+                    };
+                };
+            };
+        };
+    };
     listInstructors: {
         parameters: {
             query?: {
@@ -3344,6 +3833,53 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["DashboardView"];
+                };
+            };
+        };
+    };
+    audit: {
+        parameters: {
+            query?: {
+                q?: string;
+                page?: number;
+                size?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PageResponseAuditEntryResponse"];
+                };
+            };
+        };
+    };
+    analytics: {
+        parameters: {
+            query?: {
+                semester?: string;
+                year?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["AnalyticsView"];
                 };
             };
         };

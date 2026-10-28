@@ -2,6 +2,7 @@ package com.iiitd.erp.io.controller;
 
 import com.iiitd.erp.Domain.RegistrationOutcomeDomain;
 import com.iiitd.erp.Domain.StudentGradeDomain;
+import com.iiitd.erp.core.service.AcademicRecordService;
 import com.iiitd.erp.core.service.SectionService;
 import com.iiitd.erp.core.service.StudentService;
 import com.iiitd.erp.exception.ErpException;
@@ -31,6 +32,7 @@ class StudentControllerTest {
     @Mock private SectionService sections;
     @Mock private StudentService students;
     @Mock private CurrentUser currentUser;
+    @Mock private AcademicRecordService academicRecords;
     @InjectMocks private StudentController controller;
 
     @Test

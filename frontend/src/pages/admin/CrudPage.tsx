@@ -112,6 +112,7 @@ export function CrudPage<T>({ config }: { config: CrudConfig<T> }) {
           rows={data.data?.items}
           rowKey={config.rowKey}
           loading={data.isFetching}
+          error={data.error}
           sort={list.state.sort}
           onSort={list.toggleSort}
           empty={{ title: `No ${config.title.toLowerCase()} found` }}
