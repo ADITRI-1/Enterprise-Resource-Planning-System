@@ -1,68 +1,47 @@
 package com.iiitd.erp.io.controller;
 
+import com.iiitd.erp.Domain.CatalogSectionView;
 import com.iiitd.erp.core.service.CatalogService;
-import com.iiitd.erp.exception.ErrorCode;
-import com.iiitd.erp.exception.ErpException;
-import com.iiitd.erp.io.dto.request.CatalogSearchRequest;
-import com.iiitd.erp.io.dto.response.CourseRow;
-import com.iiitd.erp.io.dto.response.SectionRow;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
+import com.iiitd.erp.io.controller.support.Paging;
+import com.iiitd.erp.io.dto.request.ListParams;
+import com.iiitd.erp.io.dto.response.CourseResponse;
+import com.iiitd.erp.io.dto.response.PageResponse;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
+import static com.iiitd.erp.mappers.DomainToResponseMapper.DOMAIN_TO_RESPONSE_MAPPER_INSTANCE;
 
-import static com.iiitd.erp.io.controller.support.ApiResponseSupport.error;
-import static com.iiitd.erp.io.controller.support.ApiResponseSupport.from;
-
+/** Course catalog, readable by any logged-in user. */
 @RestController
 @RequestMapping("/api/catalog")
+@Tag(name = "Catalog")
 public class CatalogController {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(CatalogController.class);
-
     private final CatalogService catalogService;
+    private final Paging paging;
 
-    public CatalogController(CatalogService catalogService){
+    public CatalogController(CatalogService catalogService, Paging paging) {
         this.catalogService = catalogService;
+        this.paging = paging;
     }
 
-    @PostMapping("/list")
-    public ResponseEntity<?> list(@RequestBody CatalogSearchRequest request){
-        final String semester = request.semester() == null ? "" : request.semester();
-        final int year = request.year();
-        final String query = request.q() == null ? "" : request.q().trim();
-
-        try {
-            List<CourseRow> courses = catalogService.listCourses(semester, year, query);
-            LOGGER.debug("Catalog list returned {} courses", courses.size());
-            return ResponseEntity.ok(courses);
-        } catch (ErpException ex) {
-            LOGGER.error("Catalog list failed: {}", ex.getErrorCode().getCode(), ex);
-            return from(ex);
-        } catch (Exception ex) {
-            LOGGER.error("Unexpected catalog list error", ex);
-            return error(HttpStatus.INTERNAL_SERVER_ERROR, ErrorCode.CATALOG_LIST_FAILED);
-        }
+    @GetMapping("/courses")
+    @Operation(summary = "All courses")
+    public PageResponse<CourseResponse> courses(@ParameterObject ListParams params) {
+        return paging.page(catalogService.listCourses().stream()
+                .map(DOMAIN_TO_RESPONSE_MAPPER_INSTANCE::courseDomainToResponse)
+                .toList(), params);
     }
 
-    @GetMapping("/{courseId}/sections")
-    public ResponseEntity<?> sections(@PathVariable String courseId,
-                                      @RequestParam String semester,
-                                      @RequestParam int year){
-        try {
-            List<SectionRow> sections = catalogService.listSections(courseId, semester, year);
-            LOGGER.debug("Catalog sections for course {} returned {}", courseId, sections.size());
-            return ResponseEntity.ok(sections);
-        } catch (ErpException ex) {
-            LOGGER.error("Catalog sections failed for course {}: {}", courseId, ex.getErrorCode().getCode(), ex);
-            return from(ex);
-        } catch (Exception ex) {
-            LOGGER.error("Unexpected error fetching sections for {}", courseId, ex);
-            return error(HttpStatus.INTERNAL_SERVER_ERROR, ErrorCode.CATALOG_SECTIONS_FAILED,
-                    ErrorCode.CATALOG_SECTIONS_FAILED.format(courseId));
-        }
+    @GetMapping("/sections")
+    @Operation(summary = "Open sections with seats left, instructor and weekly schedule",
+            description = "open = active, before the registration deadline and not full.")
+    public PageResponse<CatalogSectionView> sections(@RequestParam(required = false) String semester,
+                                                     @RequestParam(required = false) Integer year,
+                                                     @RequestParam(required = false) String courseId,
+                                                     @ParameterObject ListParams params) {
+        return paging.page(catalogService.catalogSections(semester, year, courseId), params);
     }
 }

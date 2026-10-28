@@ -3,6 +3,7 @@ package com.iiitd.erp.io.controller;
 import com.iiitd.erp.Domain.AssessmentComponentDomain;
 import com.iiitd.erp.Domain.FinalGradeDomain;
 import com.iiitd.erp.Domain.InstructorScoreOverviewDomain;
+import com.iiitd.erp.Domain.SectionStatsView;
 import com.iiitd.erp.core.service.AssessmentService;
 import com.iiitd.erp.core.service.ScoreService;
 import com.iiitd.erp.core.service.SectionService;
@@ -12,35 +13,31 @@ import com.iiitd.erp.exception.ErpException;
 import com.iiitd.erp.io.controller.support.CurrentUser;
 import com.iiitd.erp.io.dto.request.AssessmentComponentRequest;
 import com.iiitd.erp.io.dto.request.UpdateStudentScoresRequest;
-import com.iiitd.erp.io.dto.response.AssessmentComponentResponse;
-import com.iiitd.erp.io.dto.response.FinalGradeResponse;
-import com.iiitd.erp.io.dto.response.InstructorProfileResponse;
-import com.iiitd.erp.io.dto.response.InstructorScoreOverviewResponse;
-import com.iiitd.erp.io.dto.response.InstructorSectionResponse;
-import com.iiitd.erp.io.dto.response.InstructorTimetableSlotResponse;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.http.*;
+import com.iiitd.erp.io.dto.response.*;
 import com.iiitd.erp.persistent.entity.erp_db.Instructor;
-import org.springframework.web.bind.annotation.*;
-
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
+import org.springframework.http.*;
+import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
-import java.util.Optional;
+import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
-import static com.iiitd.erp.io.controller.support.ApiResponseSupport.error;
-import static com.iiitd.erp.io.controller.support.ApiResponseSupport.from;
 import static com.iiitd.erp.mappers.DomainToResponseMapper.DOMAIN_TO_RESPONSE_MAPPER_INSTANCE;
 import static com.iiitd.erp.mappers.RequestToDomainMapper.REQUEST_TO_DOMAIN_MAPPER_INSTANCE;
 
+/**
+ * Instructor self-service. {instructorCode} comes from GET /api/instructor/me; instructors can
+ * only use their own code, and section-level operations additionally check they teach the section.
+ */
 @RestController
 @RequestMapping("/api/instructor")
+@Tag(name = "Instructor")
 public class InstructorController {
-
-    private static final Logger LOGGER = LoggerFactory.getLogger(InstructorController.class);
 
     private final AssessmentService assessments;
     private final SectionService sectionService;
@@ -61,248 +58,149 @@ public class InstructorController {
     }
 
     @GetMapping("/me")
-    public ResponseEntity<?> me() {
-        Optional<Instructor> instructor = currentUser.instructor();
-        if (instructor.isEmpty()) {
-            return error(HttpStatus.FORBIDDEN, ErrorCode.INSTRUCTOR_FORBIDDEN);
-        }
-        Instructor i = instructor.get();
-        return ResponseEntity.ok(new InstructorProfileResponse(
-                i.getInstructorId(), currentUser.username(), i.getInstructorCode(), i.getName(),
-                i.getDepartmentId(), i.getEmail(), i.getPhone()));
-    }
-
-
-    @GetMapping("/{instructorCode}/sections/{sectionId}/assessments")
-    public ResponseEntity<?> listAssessments(@PathVariable String instructorCode,
-                                             @PathVariable String sectionId) {
-        if (!currentUser.isInstructor(instructorCode)) {
-            LOGGER.warn("Unauthorized assessment list attempt by {}", currentUser.username());
-            return error(HttpStatus.FORBIDDEN, ErrorCode.INSTRUCTOR_FORBIDDEN);
-        }
-        try {
-            List<AssessmentComponentResponse> response = assessments.list(instructorCode, sectionId).stream()
-                    .map(DOMAIN_TO_RESPONSE_MAPPER_INSTANCE::assessmentComponentDomainToResponse)
-                    .toList();
-            return ResponseEntity.ok(response);
-        } catch (ErpException ex) {
-            LOGGER.error("Assessment list failed for {} section {}", instructorCode, sectionId, ex);
-            return from(ex);
-        }
-    }
-
-    @PostMapping("/{instructorCode}/sections/{sectionId}/assessments")
-    public ResponseEntity<?> createAssessment(@PathVariable String instructorCode,
-                                              @PathVariable String sectionId,
-                                              @RequestBody @Valid AssessmentComponentRequest request) {
-        if (!currentUser.isInstructor(instructorCode)) {
-            LOGGER.warn("Unauthorized assessment create attempt by {}", currentUser.username());
-            return error(HttpStatus.FORBIDDEN, ErrorCode.INSTRUCTOR_FORBIDDEN);
-        }
-        try {
-            AssessmentComponentDomain domain = REQUEST_TO_DOMAIN_MAPPER_INSTANCE
-                    .assessmentComponentRequestToDomain(request)
-                    .withSectionId(sectionId);
-            AssessmentComponentResponse response = DOMAIN_TO_RESPONSE_MAPPER_INSTANCE
-                    .assessmentComponentDomainToResponse(assessments.create(instructorCode, domain));
-            return ResponseEntity.status(HttpStatus.CREATED).body(response);
-        } catch (ErpException ex) {
-            LOGGER.error("Assessment creation failed for instructor {} section {}", instructorCode, sectionId, ex);
-            return from(ex);
-        }
-    }
-
-    @PutMapping("/{instructorCode}/sections/{sectionId}/assessments/{componentId}")
-    public ResponseEntity<?> updateAssessment(@PathVariable String instructorCode,
-                                              @PathVariable String sectionId,
-                                              @PathVariable UUID componentId,
-                                              @RequestBody @Valid AssessmentComponentRequest request) {
-        if (!currentUser.isInstructor(instructorCode)) {
-            LOGGER.warn("Unauthorized assessment update attempt by {}", currentUser.username());
-            return error(HttpStatus.FORBIDDEN, ErrorCode.INSTRUCTOR_FORBIDDEN);
-        }
-        try {
-            AssessmentComponentDomain domain = REQUEST_TO_DOMAIN_MAPPER_INSTANCE
-                    .assessmentComponentRequestToDomain(request)
-                    .withSectionId(sectionId);
-            AssessmentComponentResponse response = DOMAIN_TO_RESPONSE_MAPPER_INSTANCE
-                    .assessmentComponentDomainToResponse(assessments.update(instructorCode, componentId, domain));
-            return ResponseEntity.ok(response);
-        } catch (ErpException ex) {
-            LOGGER.error("Assessment update failed for instructor {} section {} component {}",
-                    instructorCode, sectionId, componentId, ex);
-            return from(ex);
-        }
-    }
-
-    @DeleteMapping("/{instructorCode}/sections/{sectionId}/assessments/{componentId}")
-    public ResponseEntity<?> deleteAssessment(@PathVariable String instructorCode,
-                                              @PathVariable String sectionId,
-                                              @PathVariable UUID componentId) {
-        if (!currentUser.isInstructor(instructorCode)) {
-            LOGGER.warn("Unauthorized assessment delete attempt by {}", currentUser.username());
-            return error(HttpStatus.FORBIDDEN, ErrorCode.INSTRUCTOR_FORBIDDEN);
-        }
-        try {
-            AssessmentComponentResponse response = DOMAIN_TO_RESPONSE_MAPPER_INSTANCE
-                    .assessmentComponentDomainToResponse(assessments.delete(instructorCode, componentId));
-            return ResponseEntity.ok(response);
-        } catch (ErpException ex) {
-            LOGGER.error("Assessment delete failed for instructor {} section {} component {}",
-                    instructorCode, sectionId, componentId, ex);
-            return from(ex);
-        }
+    @Operation(summary = "Logged-in instructor's profile (includes the instructorCode used in other URLs)")
+    public InstructorProfileResponse me() {
+        Instructor i = currentUser.instructor()
+                .orElseThrow(() -> ErpException.of(ErrorCode.INSTRUCTOR_FORBIDDEN, Map.of()));
+        return new InstructorProfileResponse(i.getInstructorId(), currentUser.username(), i.getInstructorCode(),
+                i.getName(), i.getDepartmentId(), i.getEmail(), i.getPhone());
     }
 
     @GetMapping("/{instructorCode}/sections")
-    public ResponseEntity<?> listSections(@PathVariable String instructorCode,
-                                          @RequestParam(required = false) String semester,
-                                          @RequestParam(required = false) Integer year) {
-        if (!currentUser.isInstructor(instructorCode)) {
-            LOGGER.warn("Unauthorized section list attempt by {}", currentUser.username());
-            return error(HttpStatus.FORBIDDEN, ErrorCode.INSTRUCTOR_FORBIDDEN);
-        }
-        try {
-            List<InstructorSectionResponse> response = sectionService
-                    .sectionsForInstructor(instructorCode, semester, year).stream()
-                    .map(DOMAIN_TO_RESPONSE_MAPPER_INSTANCE::sectionDomainToInstructorSectionResponse)
-                    .toList();
-            return ResponseEntity.ok(response);
-        } catch (ErpException ex) {
-            LOGGER.error("Section list failed for instructor {}", instructorCode, ex);
-            return from(ex);
-        } catch (Exception ex) {
-            LOGGER.error("Unexpected error listing sections for instructor {}", instructorCode, ex);
-            return error(HttpStatus.INTERNAL_SERVER_ERROR, ErrorCode.SECTION_LIST_FAILED);
-        }
+    @Operation(summary = "My sections")
+    public List<InstructorSectionResponse> listSections(@PathVariable String instructorCode,
+                                                        @RequestParam(required = false) String semester,
+                                                        @RequestParam(required = false) Integer year) {
+        currentUser.requireInstructor(instructorCode);
+        return sectionService.sectionsForInstructor(instructorCode, semester, year).stream()
+                .map(DOMAIN_TO_RESPONSE_MAPPER_INSTANCE::sectionDomainToInstructorSectionResponse)
+                .toList();
     }
 
     @GetMapping("/{instructorCode}/timetable")
-    public ResponseEntity<?> timetable(@PathVariable String instructorCode,
-                                       @RequestParam(required = false) String semester,
-                                       @RequestParam(required = false) Integer year) {
-        if (!currentUser.isInstructor(instructorCode)) {
-            LOGGER.warn("Unauthorized timetable request by {}", currentUser.username());
-            return error(HttpStatus.FORBIDDEN, ErrorCode.INSTRUCTOR_FORBIDDEN);
-        }
-        try {
-            List<InstructorTimetableSlotResponse> response = timetableService
-                    .timetable(instructorCode, semester, year).stream()
-                    .map(DOMAIN_TO_RESPONSE_MAPPER_INSTANCE::instructorTimetableSlotDomainToResponse)
-                    .toList();
-            return ResponseEntity.ok(response);
-        } catch (ErpException ex) {
-            LOGGER.error("Timetable fetch failed for instructor {}", instructorCode, ex);
-            return from(ex);
-        } catch (Exception ex) {
-            LOGGER.error("Unexpected timetable failure for instructor {}", instructorCode, ex);
-            return error(HttpStatus.INTERNAL_SERVER_ERROR, ErrorCode.SECTION_LIST_FAILED);
-        }
+    @Operation(summary = "My weekly timetable")
+    public List<InstructorTimetableSlotResponse> timetable(@PathVariable String instructorCode,
+                                                           @RequestParam(required = false) String semester,
+                                                           @RequestParam(required = false) Integer year) {
+        currentUser.requireInstructor(instructorCode);
+        return timetableService.timetable(instructorCode, semester, year).stream()
+                .map(DOMAIN_TO_RESPONSE_MAPPER_INSTANCE::instructorTimetableSlotDomainToResponse)
+                .toList();
     }
 
+    // ----- Assessment components -----
+
+    @GetMapping("/{instructorCode}/sections/{sectionId}/assessments")
+    @Operation(summary = "Assessment components (e.g. Quiz 20%, Midsem 30%, Endsem 50%)")
+    public List<AssessmentComponentResponse> listAssessments(@PathVariable String instructorCode,
+                                                             @PathVariable String sectionId) {
+        currentUser.requireInstructor(instructorCode);
+        return assessments.list(instructorCode, sectionId).stream()
+                .map(DOMAIN_TO_RESPONSE_MAPPER_INSTANCE::assessmentComponentDomainToResponse)
+                .toList();
+    }
+
+    @PostMapping("/{instructorCode}/sections/{sectionId}/assessments")
+    @ResponseStatus(HttpStatus.CREATED)
+    public AssessmentComponentResponse createAssessment(@PathVariable String instructorCode,
+                                                        @PathVariable String sectionId,
+                                                        @RequestBody @Valid AssessmentComponentRequest request) {
+        currentUser.requireInstructor(instructorCode);
+        AssessmentComponentDomain domain = REQUEST_TO_DOMAIN_MAPPER_INSTANCE
+                .assessmentComponentRequestToDomain(request)
+                .withSectionId(sectionId);
+        return DOMAIN_TO_RESPONSE_MAPPER_INSTANCE.assessmentComponentDomainToResponse(
+                assessments.create(instructorCode, domain));
+    }
+
+    @PutMapping("/{instructorCode}/sections/{sectionId}/assessments/{componentId}")
+    public AssessmentComponentResponse updateAssessment(@PathVariable String instructorCode,
+                                                        @PathVariable String sectionId,
+                                                        @PathVariable UUID componentId,
+                                                        @RequestBody @Valid AssessmentComponentRequest request) {
+        currentUser.requireInstructor(instructorCode);
+        AssessmentComponentDomain domain = REQUEST_TO_DOMAIN_MAPPER_INSTANCE
+                .assessmentComponentRequestToDomain(request)
+                .withSectionId(sectionId);
+        return DOMAIN_TO_RESPONSE_MAPPER_INSTANCE.assessmentComponentDomainToResponse(
+                assessments.update(instructorCode, componentId, domain));
+    }
+
+    @DeleteMapping("/{instructorCode}/sections/{sectionId}/assessments/{componentId}")
+    public AssessmentComponentResponse deleteAssessment(@PathVariable String instructorCode,
+                                                        @PathVariable String sectionId,
+                                                        @PathVariable UUID componentId) {
+        currentUser.requireInstructor(instructorCode);
+        return DOMAIN_TO_RESPONSE_MAPPER_INSTANCE.assessmentComponentDomainToResponse(
+                assessments.delete(instructorCode, componentId));
+    }
+
+    // ----- Scores -----
+
     @GetMapping("/{instructorCode}/sections/{sectionId}/students")
-    public ResponseEntity<?> listStudents(@PathVariable String instructorCode,
-                                          @PathVariable String sectionId) {
-        if (!currentUser.isInstructor(instructorCode)) {
-            LOGGER.warn("Unauthorized student list attempt by {}", currentUser.username());
-            return error(HttpStatus.FORBIDDEN, ErrorCode.INSTRUCTOR_FORBIDDEN);
-        }
-        try {
-            InstructorScoreOverviewDomain overview = scoreService.overview(instructorCode, sectionId);
-            return ResponseEntity.ok(toScoreResponse(overview));
-        } catch (ErpException ex) {
-            LOGGER.error("Student list failed for instructor {} section {}", instructorCode, sectionId, ex);
-            return from(ex);
-        }
+    @Operation(summary = "Gradebook: enrolled students with their component scores")
+    public InstructorScoreOverviewResponse listStudents(@PathVariable String instructorCode,
+                                                        @PathVariable String sectionId) {
+        currentUser.requireInstructor(instructorCode);
+        return toScoreResponse(scoreService.overview(instructorCode, sectionId));
     }
 
     @PutMapping("/{instructorCode}/sections/{sectionId}/scores")
-    public ResponseEntity<?> updateScores(@PathVariable String instructorCode,
-                                          @PathVariable String sectionId,
-                                          @RequestBody @Valid UpdateStudentScoresRequest request) {
-        if (!currentUser.isInstructor(instructorCode)) {
-            LOGGER.warn("Unauthorized score update by {}", currentUser.username());
-            return error(HttpStatus.FORBIDDEN, ErrorCode.INSTRUCTOR_FORBIDDEN);
-        }
-        try {
-            InstructorScoreOverviewDomain overview = scoreService.updateScores(
-                    instructorCode, sectionId, request, currentUser.username());
-            return ResponseEntity.ok(toScoreResponse(overview));
-        } catch (ErpException ex) {
-            LOGGER.error("Score update failed for instructor {} section {}", instructorCode, sectionId, ex);
-            return from(ex);
-        }
+    @Operation(summary = "Save scores")
+    public InstructorScoreOverviewResponse updateScores(@PathVariable String instructorCode,
+                                                        @PathVariable String sectionId,
+                                                        @RequestBody @Valid UpdateStudentScoresRequest request) {
+        currentUser.requireInstructor(instructorCode);
+        return toScoreResponse(scoreService.updateScores(instructorCode, sectionId, request, currentUser.username()));
     }
 
     @GetMapping("/{instructorCode}/sections/{sectionId}/scores/export")
-    public ResponseEntity<?> exportScores(@PathVariable String instructorCode,
-                                          @PathVariable String sectionId) {
-        if (!currentUser.isInstructor(instructorCode)) {
-            LOGGER.warn("Unauthorized score export by {}", currentUser.username());
-            return error(HttpStatus.FORBIDDEN, ErrorCode.INSTRUCTOR_FORBIDDEN);
-        }
-        try {
-            byte[] csv = scoreService.exportCsv(instructorCode, sectionId);
-            HttpHeaders headers = new HttpHeaders();
-            headers.setContentDisposition(ContentDisposition.attachment()
-                    .filename("scores-" + sectionId + ".csv").build());
-            headers.setContentType(MediaType.TEXT_PLAIN);
-            return new ResponseEntity<>(csv, headers, HttpStatus.OK);
-        } catch (ErpException ex) {
-            LOGGER.error("Score export failed for instructor {} section {}", instructorCode, sectionId, ex);
-            return from(ex);
-        }
+    @Operation(summary = "Download the gradebook as CSV (can be edited and re-imported)")
+    public ResponseEntity<byte[]> exportScores(@PathVariable String instructorCode,
+                                               @PathVariable String sectionId) {
+        currentUser.requireInstructor(instructorCode);
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentDisposition(ContentDisposition.attachment().filename("scores-" + sectionId + ".csv").build());
+        headers.setContentType(MediaType.parseMediaType("text/csv"));
+        return new ResponseEntity<>(scoreService.exportCsv(instructorCode, sectionId), headers, HttpStatus.OK);
     }
 
     @PostMapping(path = "/{instructorCode}/sections/{sectionId}/scores/import",
             consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<?> importScores(@PathVariable String instructorCode,
-                                          @PathVariable String sectionId,
-                                          @RequestParam("file") MultipartFile file) {
-        if (!currentUser.isInstructor(instructorCode)) {
-            LOGGER.warn("Unauthorized score import by {}", currentUser.username());
-            return error(HttpStatus.FORBIDDEN, ErrorCode.INSTRUCTOR_FORBIDDEN);
-        }
-        try {
-            InstructorScoreOverviewDomain overview = scoreService.importCsv(
-                    instructorCode, sectionId, file, currentUser.username());
-            return ResponseEntity.ok(toScoreResponse(overview));
-        } catch (ErpException ex) {
-            LOGGER.error("Score import failed for instructor {} section {}", instructorCode, sectionId, ex);
-            return from(ex);
-        }
+    @Operation(summary = "Upload a gradebook CSV", description = "Component columns may be names (as exported) or component ids.")
+    public InstructorScoreOverviewResponse importScores(@PathVariable String instructorCode,
+                                                        @PathVariable String sectionId,
+                                                        @RequestParam("file") MultipartFile file) {
+        currentUser.requireInstructor(instructorCode);
+        return toScoreResponse(scoreService.importCsv(instructorCode, sectionId, file, currentUser.username()));
     }
 
-
+    // ----- Final grades & stats -----
 
     @PostMapping("/{instructorCode}/sections/{sectionId}/grades/compute")
-    public ResponseEntity<?> computeGrades(@PathVariable String instructorCode,
-                                           @PathVariable String sectionId) {
-        if (!currentUser.isInstructor(instructorCode)) {
-            LOGGER.warn("Unauthorized grade computation by {}", currentUser.username());
-            return error(HttpStatus.FORBIDDEN, ErrorCode.INSTRUCTOR_FORBIDDEN);
-        }
-        try {
-            return ResponseEntity.ok(toFinalGradeResponse(scoreService.computeFinalGrades(instructorCode, sectionId)));
-        } catch (ErpException ex) {
-            LOGGER.error("Grade computation failed for instructor {} section {}", instructorCode, sectionId, ex);
-            return from(ex);
-        }
+    @Operation(summary = "Compute final grades",
+            description = "total = sum(score / outOf x weight) x 100; A>=90, A->=80, B>=70, B->=60, C>=50, C->=40, D>=30, else F. "
+                    + "Component weights must add up to 100%.")
+    public List<FinalGradeResponse> computeGrades(@PathVariable String instructorCode,
+                                                  @PathVariable String sectionId) {
+        currentUser.requireInstructor(instructorCode);
+        return toFinalGradeResponse(scoreService.computeFinalGrades(instructorCode, sectionId));
     }
 
     @GetMapping("/{instructorCode}/sections/{sectionId}/grades")
-    public ResponseEntity<?> finalGrades(@PathVariable String instructorCode,
-                                         @PathVariable String sectionId) {
-        if (!currentUser.isInstructor(instructorCode)) {
-            LOGGER.warn("Unauthorized final grade request by {}", currentUser.username());
-            return error(HttpStatus.FORBIDDEN, ErrorCode.INSTRUCTOR_FORBIDDEN);
-        }
-        try {
-            return ResponseEntity.ok(toFinalGradeResponse(scoreService.finalGrades(instructorCode, sectionId)));
-        } catch (ErpException ex) {
-            LOGGER.error("Final grade fetch failed for instructor {} section {}", instructorCode, sectionId, ex);
-            return from(ex);
-        }
+    @Operation(summary = "Final grades as last computed")
+    public List<FinalGradeResponse> finalGrades(@PathVariable String instructorCode,
+                                                @PathVariable String sectionId) {
+        currentUser.requireInstructor(instructorCode);
+        return toFinalGradeResponse(scoreService.finalGrades(instructorCode, sectionId));
+    }
+
+    @GetMapping("/{instructorCode}/sections/{sectionId}/stats")
+    @Operation(summary = "Class statistics", description = "Per-component average/min/max/median over entered scores, "
+            + "plus final-grade average and distribution.")
+    public SectionStatsView stats(@PathVariable String instructorCode, @PathVariable String sectionId) {
+        currentUser.requireInstructor(instructorCode);
+        return scoreService.sectionStats(instructorCode, sectionId);
     }
 
     private List<FinalGradeResponse> toFinalGradeResponse(List<FinalGradeDomain> grades) {
@@ -313,9 +211,8 @@ public class InstructorController {
     }
 
     private InstructorScoreOverviewResponse toScoreResponse(InstructorScoreOverviewDomain overview) {
-        List<AssessmentComponentResponse> components = overview.getComponents().stream()
-                .map(DOMAIN_TO_RESPONSE_MAPPER_INSTANCE::assessmentComponentDomainToResponse)
-                .toList();
+        Map<UUID, AssessmentComponentDomain> componentsById = overview.getComponents().stream()
+                .collect(Collectors.toMap(AssessmentComponentDomain::getComponentId, c -> c));
         List<InstructorScoreOverviewResponse.StudentScoreRow> students = overview.getStudents().stream()
                 .map(student -> InstructorScoreOverviewResponse.StudentScoreRow.builder()
                         .enrollmentId(student.getEnrollmentId())
@@ -323,27 +220,23 @@ public class InstructorController {
                         .studentName(student.getStudentName())
                         .rollNo(student.getRollNo())
                         .scores(student.getComponentScores().entrySet().stream()
-                                .map(entry -> InstructorScoreOverviewResponse.StudentComponentScore.builder()
-                                        .componentId(entry.getKey())
-                                        .componentName(overview.getComponents().stream()
-                                                .filter(c -> c.getComponentId().equals(entry.getKey()))
-                                                .findFirst()
-                                                .map(AssessmentComponentDomain::getName)
-                                                .orElse(""))
-                                        .score(entry.getValue())
-                                        .scoreOutOf(overview.getComponents().stream()
-                                                .filter(c -> c.getComponentId().equals(entry.getKey()))
-                                                .findFirst()
-                                                .map(AssessmentComponentDomain::getScoreOutOf)
-                                                .orElse(0))
-                                        .build())
+                                .map(entry -> {
+                                    AssessmentComponentDomain c = componentsById.get(entry.getKey());
+                                    return InstructorScoreOverviewResponse.StudentComponentScore.builder()
+                                            .componentId(entry.getKey())
+                                            .componentName(c != null ? c.getName() : "")
+                                            .score(entry.getValue())
+                                            .scoreOutOf(c != null ? c.getScoreOutOf() : 0)
+                                            .build();
+                                })
                                 .toList())
                         .build())
                 .toList();
         return InstructorScoreOverviewResponse.builder()
-                .components(components)
+                .components(overview.getComponents().stream()
+                        .map(DOMAIN_TO_RESPONSE_MAPPER_INSTANCE::assessmentComponentDomainToResponse)
+                        .toList())
                 .students(students)
                 .build();
     }
-
 }

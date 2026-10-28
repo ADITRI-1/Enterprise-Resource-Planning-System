@@ -5,7 +5,10 @@ import com.iiitd.erp.core.service.AuthSessionService;
 import com.iiitd.erp.core.service.MaintenanceService;
 import com.iiitd.erp.exception.ErrorCode;
 import com.iiitd.erp.exception.ErpException;
+import com.iiitd.erp.core.service.AccountService;
+import com.iiitd.erp.io.controller.support.CurrentUser;
 import com.iiitd.erp.io.controller.support.MaintenanceReadOnlyInterceptor;
+import com.iiitd.erp.io.controller.support.PasswordChangeRequiredInterceptor;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,7 +32,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 @WebMvcTest(AuthController.class)
-@Import(MaintenanceReadOnlyInterceptor.class)
+@Import({MaintenanceReadOnlyInterceptor.class, PasswordChangeRequiredInterceptor.class})
 @AutoConfigureMockMvc(addFilters = false)
 class AuthControllerTest {
 
@@ -37,6 +40,8 @@ class AuthControllerTest {
 
     @MockitoBean AuthSessionService authSessionService;
     @MockitoBean MaintenanceService maintenanceService;
+    @MockitoBean AccountService accountService;
+    @MockitoBean CurrentUser currentUser;
 
     @Test
     void login_success() throws Exception {
@@ -80,8 +85,7 @@ class AuthControllerTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"username\":\"admin1\",\"password\":\"password\"}"))
                 .andExpect(status().isInternalServerError())
-                .andExpect(jsonPath("errorCode").value(ErrorCode.AUTHENTICATION_FAILED.getCode()))
-                .andExpect(jsonPath("message").value(ErrorCode.AUTHENTICATION_FAILED.format("admin1")));
+                .andExpect(jsonPath("errorCode").value(ErrorCode.UNEXPECTED_SERVER_ERROR.getCode()));
     }
 
     @Test

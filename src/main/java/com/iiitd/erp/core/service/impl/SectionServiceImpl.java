@@ -282,6 +282,58 @@ public class SectionServiceImpl implements SectionService {
 
     @Override
     @Transactional(readOnly = true)
+    public List<RegistrationView> registrationsForStudent(String studentUserId, String semester, Integer year) {
+        UUID studentId = requireStudent(studentUserId);
+        String normalizedSemester = semester == null || semester.isBlank() ? null : normalizeSemester(semester);
+        List<EnrollmentDomain> all = enrollments.findByStudentAndStatuses(studentId,
+                List.of(EnrollmentDomain.ENROLLED, EnrollmentDomain.DROPPED, EnrollmentDomain.COMPLETED));
+        Map<UUID, String> finalGrades = grades.findByEnrollmentIdInAndComponent(
+                        all.stream().map(EnrollmentDomain::getEnrollmentId).toList(), FINAL_COMPONENT)
+                .stream()
+                .filter(g -> g.getFinalGrade() != null)
+                .collect(Collectors.toMap(Grade::getEnrollmentId, Grade::getFinalGrade));
+
+        LocalDate today = LocalDate.now();
+        Map<String, CourseDomain> courseCache = new HashMap<>();
+        Map<String, InstructorDomain> instructorCache = new HashMap<>();
+        List<RegistrationView> rows = new ArrayList<>();
+        for (EnrollmentDomain enrollment : all) {
+            SectionDomain section = sections.findBySectionId(enrollment.getSectionId());
+            if (section == null
+                    || (normalizedSemester != null && !normalizedSemester.equalsIgnoreCase(section.getSemester()))
+                    || (year != null && !year.equals(section.getYear()))) {
+                continue;
+            }
+            CourseDomain course = courseCache.computeIfAbsent(section.getCourseId(), courses::findByCourseId);
+            InstructorDomain instructor = instructorCache.computeIfAbsent(section.getInstructorCode(),
+                    instructors::findByInstructorCode);
+            boolean enrolled = EnrollmentDomain.ENROLLED.equalsIgnoreCase(enrollment.getStatus());
+            boolean beforeDeadline = section.getRegistrationDeadline() == null
+                    || !today.isAfter(section.getRegistrationDeadline());
+            rows.add(new RegistrationView(
+                    enrollment.getEnrollmentId(),
+                    section.getSectionId(),
+                    section.getCourseId(),
+                    course != null ? course.getTitle() : null,
+                    course != null && course.getCredits() != null ? course.getCredits() : 0,
+                    section.getInstructorCode(),
+                    instructor != null ? instructor.getName() : null,
+                    section.getSemester(),
+                    section.getYear() == null ? 0 : section.getYear(),
+                    enrollment.getStatus().toLowerCase(Locale.ROOT),
+                    enrollment.getEnrollmentDate(),
+                    section.getRegistrationDeadline(),
+                    enrolled && beforeDeadline,
+                    finalGrades.get(enrollment.getEnrollmentId())));
+        }
+        rows.sort(Comparator.comparing(RegistrationView::year).reversed()
+                .thenComparing(RegistrationView::semester)
+                .thenComparing(RegistrationView::courseId));
+        return rows;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
     public byte[] exportTranscript(String studentUserId) {
         List<StudentGradeDomain> gradeRows = gradesForStudent(studentUserId);
         StringBuilder sb = new StringBuilder();

@@ -1,6 +1,8 @@
 package com.iiitd.erp.core.service.support;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Converts a weighted total (0-100) to a letter grade. Bands are inclusive lower bounds.
@@ -20,5 +22,12 @@ public final class GradeScale {
             }
         }
         return "F";
+    }
+
+    /** All letters from best to worst, ending with F. */
+    public static List<String> letters() {
+        List<String> all = new ArrayList<>(List.of(LETTERS));
+        all.add("F");
+        return all;
     }
 }

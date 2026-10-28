@@ -207,6 +207,65 @@ public class ScoreServiceImpl implements ScoreService {
     }
 
     @Override
+    @Transactional(readOnly = true)
+    public SectionStatsView sectionStats(String instructorCode, String sectionId) {
+        SectionDomain section = ensureSectionOwnership(instructorCode, sectionId);
+        List<AssessmentComponentDomain> components = assessmentService.list(instructorCode, sectionId);
+        List<EnrollmentRepository.SectionEnrollmentProjection> students = enrollmentRepository.findActiveStudents(sectionId);
+        Set<UUID> activeEnrollments = students.stream()
+                .map(EnrollmentRepository.SectionEnrollmentProjection::getEnrollmentId)
+                .collect(Collectors.toSet());
+
+        // Only real, entered scores count: a student without a score is "not graded", not 0.
+        Map<UUID, List<Double>> scoresByComponent = scores.findBySection(sectionId).stream()
+                .filter(sc -> activeEnrollments.contains(sc.getEnrollmentId()))
+                .collect(Collectors.groupingBy(AssessmentScoreDomain::getComponentId,
+                        Collectors.mapping(sc -> sc.getScore().doubleValue(), Collectors.toList())));
+
+        List<SectionStatsView.ComponentStats> componentStats = components.stream()
+                .map(c -> {
+                    List<Double> values = scoresByComponent.getOrDefault(c.getComponentId(), List.of());
+                    Double average = average(values);
+                    Double averagePercent = average == null ? null : round(average * 100 / c.getScoreOutOf());
+                    return new SectionStatsView.ComponentStats(c.getComponentId(), c.getName(), c.getWeight(),
+                            c.getScoreOutOf(), values.size(), average, averagePercent,
+                            values.stream().min(Double::compare).orElse(null),
+                            values.stream().max(Double::compare).orElse(null),
+                            median(values));
+                })
+                .toList();
+
+        List<Grade> finals = grades.findByEnrollmentIdInAndComponent(activeEnrollments, FINAL_COMPONENT);
+        List<Double> totals = finals.stream().map(g -> g.getScore().doubleValue()).toList();
+        Map<String, Long> distribution = new LinkedHashMap<>();
+        GradeScale.letters().forEach(letter -> distribution.put(letter, 0L));
+        finals.forEach(g -> distribution.merge(g.getFinalGrade(), 1L, Long::sum));
+
+        return new SectionStatsView(section.getSectionId(), section.getCourseId(), students.size(), componentStats,
+                new SectionStatsView.FinalStats(finals.size(), average(totals),
+                        totals.stream().min(Double::compare).orElse(null),
+                        totals.stream().max(Double::compare).orElse(null),
+                        distribution));
+    }
+
+    private static Double average(List<Double> values) {
+        return values.isEmpty() ? null : round(values.stream().mapToDouble(Double::doubleValue).average().orElse(0));
+    }
+
+    private static Double median(List<Double> values) {
+        if (values.isEmpty()) {
+            return null;
+        }
+        List<Double> sorted = values.stream().sorted().toList();
+        int mid = sorted.size() / 2;
+        return round(sorted.size() % 2 == 1 ? sorted.get(mid) : (sorted.get(mid - 1) + sorted.get(mid)) / 2);
+    }
+
+    private static double round(double value) {
+        return BigDecimal.valueOf(value).setScale(2, RoundingMode.HALF_UP).doubleValue();
+    }
+
+    @Override
     public InstructorScoreOverviewDomain importCsv(String instructorCode, String sectionId,
                                                    MultipartFile file, String updatedBy) {
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(file.getInputStream(), StandardCharsets.UTF_8))) {

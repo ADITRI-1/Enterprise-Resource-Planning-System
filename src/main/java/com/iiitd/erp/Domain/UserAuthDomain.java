@@ -20,4 +20,7 @@ public class UserAuthDomain {
     private String sessionId;
     private OffsetDateTime lastLogin;
     private Boolean firstLogin;
+    private boolean mustChangePassword;
+    private int failedAttempts;
+    private OffsetDateTime lockedUntil;
 }

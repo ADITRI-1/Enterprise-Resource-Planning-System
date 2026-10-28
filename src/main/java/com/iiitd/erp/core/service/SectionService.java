@@ -1,6 +1,7 @@
 package com.iiitd.erp.core.service;
 
 import com.iiitd.erp.Domain.RegistrationOutcomeDomain;
+import com.iiitd.erp.Domain.RegistrationView;
 import com.iiitd.erp.Domain.SectionDomain;
 import com.iiitd.erp.Domain.StudentGradeDomain;
 import com.iiitd.erp.Domain.StudentTimeTableSlotDomain;
@@ -20,5 +21,7 @@ public interface SectionService {
     boolean dropStudent(String studentUserId, String sectionId);
     List<StudentTimeTableSlotDomain> timetableForStudent(String studentUserId, String semester, int year);
     List<StudentGradeDomain> gradesForStudent(String studentUserId);
+    /** Every enrollment of the student (enrolled, dropped, completed), optionally limited to one term. */
+    List<RegistrationView> registrationsForStudent(String studentUserId, String semester, Integer year);
     byte[] exportTranscript(String studentUserId);
 }

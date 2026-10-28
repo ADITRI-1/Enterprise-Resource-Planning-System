@@ -15,4 +15,5 @@ public class CreateUserDomain {
     String username;
     Role role;
     AccountStatus status;
+    String temporaryPassword;
 }

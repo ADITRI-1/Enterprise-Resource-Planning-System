@@ -126,6 +126,28 @@ recreate it; the old schema doesn't match the code.
 After logging in, call `GET /api/student/me` or `GET /api/instructor/me` to get the
 user id / instructor code used in the other student and instructor URLs.
 
+### API docs
+
+With the app running, open **http://localhost:8080/swagger-ui.html**. Every endpoint is listed
+and can be tried in the browser: run `POST /api/auth/login` first and the session cookie is reused.
+
+### Account security
+
+* Accounts created by an admin get a random temporary password, returned once in the create
+  response. Until the user changes it (`POST /api/auth/change-password`), every endpoint outside
+  `/api/auth/**` answers `403 PASSWORD_CHANGE_REQUIRED`.
+* Passwords need 8+ characters with a letter and a digit, must not contain the username, and
+  can't repeat any of the last 3.
+* 5 wrong passwords lock the account for 15 minutes (`423`). A wrong-password response includes
+  `details.remainingAttempts`. Admins can `POST /api/admin/users/{username}/unlock` or
+  `/reset-password`.
+
+### Lists
+
+Collection endpoints (admin lists, catalog, accounts) return
+`{ items, page, size, totalItems, totalPages }` and accept `q` (search), `sort` (`title` or
+`title,desc`), `page` (from 0) and `size` (max 200).
+
 ### Tests
 
     ./mvnw test

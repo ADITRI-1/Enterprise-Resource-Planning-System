@@ -1,92 +1,78 @@
 package com.iiitd.erp.io.controller;
 
 import com.iiitd.erp.Domain.AuthResultDomain;
-import com.iiitd.erp.Domain.LoginRequestDomain;
+import com.iiitd.erp.core.service.AccountService;
 import com.iiitd.erp.core.service.AuthSessionService;
 import com.iiitd.erp.exception.ErrorCode;
 import com.iiitd.erp.exception.ErpException;
+import com.iiitd.erp.io.controller.support.CurrentUser;
+import com.iiitd.erp.io.dto.request.ChangePasswordRequest;
 import com.iiitd.erp.io.dto.request.LoginRequest;
 import com.iiitd.erp.io.dto.response.LoginResponse;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.validation.Valid;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
-import static com.iiitd.erp.io.controller.support.ApiResponseSupport.error;
-import static com.iiitd.erp.io.controller.support.ApiResponseSupport.from;
+import java.util.Map;
+
 import static com.iiitd.erp.mappers.DomainToResponseMapper.DOMAIN_TO_RESPONSE_MAPPER_INSTANCE;
-import static com.iiitd.erp.mappers.RequestToDomainMapper.REQUEST_TO_DOMAIN_MAPPER_INSTANCE;
 
 @RestController
 @RequestMapping("/api/auth")
+@Tag(name = "Auth", description = "Login, session and password management")
 public class AuthController {
 
-    private static final Logger LOGGER = LoggerFactory.getLogger(AuthController.class);
-
     private final AuthSessionService authSessionService;
+    private final AccountService accountService;
+    private final CurrentUser currentUser;
 
-    public AuthController(AuthSessionService authSessionService){
+    public AuthController(AuthSessionService authSessionService, AccountService accountService, CurrentUser currentUser) {
         this.authSessionService = authSessionService;
+        this.accountService = accountService;
+        this.currentUser = currentUser;
     }
 
     @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody @Valid LoginRequest body, HttpServletRequest request){
-        LoginRequestDomain loginRequest = REQUEST_TO_DOMAIN_MAPPER_INSTANCE.loginRequestToDomain(body);
-        String username = loginRequest.getUsername();
-        LOGGER.info("Login attempt for {}", username);
-        try {
-            AuthResultDomain result = authSessionService.loginAndCreateSession(username, loginRequest.getPassword(), loginRequest.getRole(), request);
-            LoginResponse response = DOMAIN_TO_RESPONSE_MAPPER_INSTANCE.domainToLoginResponse(result).withMessage("Login Successful");
-            return ResponseEntity.ok(response);
-        } catch (ErpException ex) {
-            LOGGER.warn("Login failed for {}: {}", username, ex.getErrorCode().getCode(), ex);
-            return from(ex);
-        } catch (Exception ex) {
-            LOGGER.error("Unexpected error during login for {}", username, ex);
-            return error(HttpStatus.INTERNAL_SERVER_ERROR, ErrorCode.AUTHENTICATION_FAILED,
-                    ErrorCode.AUTHENTICATION_FAILED.format(username));
-        }
+    @Operation(summary = "Log in and start a session",
+            description = "Returns 401 with details.remainingAttempts on a wrong password and 423 once the account is "
+                    + "locked. When mustChangePassword is true, only /api/auth/** works until the password is changed.")
+    public LoginResponse login(@RequestBody @Valid LoginRequest body, HttpServletRequest request) {
+        AuthResultDomain result = authSessionService.loginAndCreateSession(
+                body.username(), body.password(), body.role(), request);
+        return DOMAIN_TO_RESPONSE_MAPPER_INSTANCE.domainToLoginResponse(result).withMessage("Login Successful");
     }
 
     @GetMapping("/me")
-    public ResponseEntity<?> me(HttpServletRequest request) {
-        try {
-            AuthResultDomain result = authSessionService.currentUser(request);
-            if (result == null) {
-                LOGGER.debug("Current user lookup returned empty");
-                return error(HttpStatus.UNAUTHORIZED, ErrorCode.AUTH_NOT_AUTHENTICATED);
-            }
-            return ResponseEntity.ok(result);
-        } catch (ErpException ex) {
-            LOGGER.error("Failed to fetch current user: {}", ex.getErrorCode().getCode(), ex);
-            return from(ex);
-        } catch (Exception ex) {
-            LOGGER.error("Unexpected error while checking current user", ex);
-            return error(HttpStatus.INTERNAL_SERVER_ERROR, ErrorCode.AUTHENTICATION_FAILED,
-                    "Failed to resolve current session");
+    @Operation(summary = "Current session's account")
+    public AuthResultDomain me(HttpServletRequest request) {
+        AuthResultDomain result = authSessionService.currentUser(request);
+        if (result == null) {
+            throw ErpException.of(ErrorCode.AUTH_NOT_AUTHENTICATED, Map.of());
         }
+        return result;
+    }
+
+    @PostMapping("/change-password")
+    @Operation(summary = "Change your own password",
+            description = "At least 8 characters with a letter and a digit, not containing the username, "
+                    + "and different from the last 3 passwords.")
+    public Map<String, String> changePassword(@RequestBody @Valid ChangePasswordRequest body) {
+        String username = currentUser.requireAccount().getUsername();
+        accountService.changePassword(username, body.currentPassword(), body.newPassword());
+        return Map.of("message", "Password changed");
     }
 
     @PostMapping("/logout")
-    public ResponseEntity<?> logout(HttpServletRequest request) {
-        try {
-            var session = request.getSession(false);
-            if (session != null) {
-                session.invalidate();
-            }
-            org.springframework.security.core.context.SecurityContextHolder.clearContext();
-            LOGGER.info("Session invalidated for {}", request.getRemoteAddr());
-            return ResponseEntity.ok(java.util.Map.of("message", "Logged out"));
-        } catch (ErpException ex) {
-            LOGGER.error("Business error during logout: {}", ex.getErrorCode().getCode(), ex);
-            return from(ex);
-        } catch (Exception ex) {
-            LOGGER.error("Unexpected error during logout", ex);
-            return error(HttpStatus.INTERNAL_SERVER_ERROR, ErrorCode.AUTHENTICATION_FAILED,
-                    "Unable to logout at this time");
+    @Operation(summary = "End the session")
+    public Map<String, String> logout(HttpServletRequest request) {
+        var session = request.getSession(false);
+        if (session != null) {
+            session.invalidate();
         }
+        SecurityContextHolder.clearContext();
+        return Map.of("message", "Logged out");
     }
 }

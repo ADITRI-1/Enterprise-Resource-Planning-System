@@ -2,6 +2,7 @@ package com.iiitd.erp.core.service;
 
 import com.iiitd.erp.Domain.FinalGradeDomain;
 import com.iiitd.erp.Domain.InstructorScoreOverviewDomain;
+import com.iiitd.erp.Domain.SectionStatsView;
 import com.iiitd.erp.io.dto.request.UpdateStudentScoresRequest;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -18,4 +19,5 @@ public interface ScoreService {
     /** Applies the section's component weights to every enrolled student's scores and stores the letter grade. */
     List<FinalGradeDomain> computeFinalGrades(String instructorCode, String sectionId);
     List<FinalGradeDomain> finalGrades(String instructorCode, String sectionId);
+    SectionStatsView sectionStats(String instructorCode, String sectionId);
 }

@@ -1,5 +1,7 @@
 package com.iiitd.erp.io.controller.support;
 
+import com.iiitd.erp.exception.ErpException;
+import com.iiitd.erp.exception.ErrorCode;
 import com.iiitd.erp.persistent.entity.auth_db.UserAuth;
 import com.iiitd.erp.persistent.entity.erp_db.Instructor;
 import com.iiitd.erp.persistent.persistence.repository.InstructorRepository;
@@ -9,6 +11,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -53,6 +56,24 @@ public class CurrentUser {
     /** True when the caller is an instructor and {@code instructorCode} is their own code. */
     public boolean isInstructor(String instructorCode) {
         return instructor().map(i -> i.getInstructorCode().equalsIgnoreCase(instructorCode)).orElse(false);
+    }
+
+    /** Throws 403 unless the caller is the student identified by {@code studentUserId}. */
+    public void requireStudent(String studentUserId) {
+        if (!isStudent(studentUserId)) {
+            throw ErpException.of(ErrorCode.STUDENT_FORBIDDEN, Map.of());
+        }
+    }
+
+    /** Throws 403 unless the caller is the instructor identified by {@code instructorCode}. */
+    public void requireInstructor(String instructorCode) {
+        if (!isInstructor(instructorCode)) {
+            throw ErpException.of(ErrorCode.INSTRUCTOR_FORBIDDEN, Map.of());
+        }
+    }
+
+    public UserAuth requireAccount() {
+        return account().orElseThrow(() -> ErpException.of(ErrorCode.AUTH_NOT_AUTHENTICATED, Map.of()));
     }
 
     public String username() {

@@ -20,4 +20,5 @@ public class AuthResultDomain {
     private String sessionId;        // JSESSIONID (for debugging/UI)
     private OffsetDateTime lastLogin; // previous login time (if you store it)
     private Boolean firstLogin;
+    private boolean mustChangePassword;
 }

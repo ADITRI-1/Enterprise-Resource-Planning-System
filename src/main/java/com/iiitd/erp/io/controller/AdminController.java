@@ -3,33 +3,36 @@ package com.iiitd.erp.io.controller;
 import com.iiitd.erp.Domain.*;
 import com.iiitd.erp.core.service.*;
 import com.iiitd.erp.core.service.dto.SectionScheduleResult;
-import com.iiitd.erp.exception.ErrorCode;
-import com.iiitd.erp.exception.ErpException;
+import com.iiitd.erp.io.controller.support.Paging;
 import com.iiitd.erp.io.dto.request.*;
 import com.iiitd.erp.io.dto.response.*;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springdoc.core.annotations.ParameterObject;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.DayOfWeek;
 import java.time.LocalTime;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
-import static com.iiitd.erp.io.controller.support.ApiResponseSupport.error;
-import static com.iiitd.erp.io.controller.support.ApiResponseSupport.from;
 import static com.iiitd.erp.mappers.DomainToResponseMapper.DOMAIN_TO_RESPONSE_MAPPER_INSTANCE;
 import static com.iiitd.erp.mappers.RequestToDomainMapper.REQUEST_TO_DOMAIN_MAPPER_INSTANCE;
 
+/**
+ * Admin back-office. Access is restricted to the ADMIN role in SecurityConfig, and errors are
+ * turned into responses by GlobalApiExceptionHandler, so handlers only contain the happy path.
+ * List endpoints accept q / sort / page / size (see {@link ListParams}).
+ */
 @RestController
 @RequestMapping("/api/admin")
+@Tag(name = "Admin")
 public class AdminController {
 
     private static final Logger LOGGER = LoggerFactory.getLogger(AdminController.class);
@@ -45,7 +48,9 @@ public class AdminController {
     private final AvailabilityService availabilityService;
     private final SectionScheduleService sectionScheduleService;
     private final TimetableService timetableService;
-
+    private final AccountService accountService;
+    private final DashboardService dashboardService;
+    private final Paging paging;
 
     public AdminController(StudentService studentService,
                            InstructorService instructorService,
@@ -57,7 +62,10 @@ public class AdminController {
                            SectionService sectionService,
                            AvailabilityService availabilityService,
                            SectionScheduleService sectionScheduleService,
-                           TimetableService timetableService) {
+                           TimetableService timetableService,
+                           AccountService accountService,
+                           DashboardService dashboardService,
+                           Paging paging) {
         this.studentService = studentService;
         this.instructorService = instructorService;
         this.programService = programService;
@@ -69,815 +77,335 @@ public class AdminController {
         this.availabilityService = availabilityService;
         this.sectionScheduleService = sectionScheduleService;
         this.timetableService = timetableService;
+        this.accountService = accountService;
+        this.dashboardService = dashboardService;
+        this.paging = paging;
     }
 
-    // ----- Student listing + CRUD -----
+    // ----- Dashboard -----
+
+    @GetMapping("/dashboard")
+    @Operation(summary = "Counts for the admin home page")
+    public DashboardView dashboard() {
+        return dashboardService.adminDashboard();
+    }
+
+    // ----- Login accounts -----
+
+    @GetMapping("/users")
+    @Operation(summary = "All login accounts with lock / password-change state")
+    public PageResponse<AccountResponse> listAccounts(@ParameterObject ListParams params) {
+        OffsetDateTime now = OffsetDateTime.now();
+        return paging.page(accountService.listAccounts().stream()
+                .map(u -> new AccountResponse(u.getUserId(), u.getUsername(), u.getRole(), u.getStatus(),
+                        u.getLastLogin(), u.getLockedUntil() != null && u.getLockedUntil().isAfter(now),
+                        u.getLockedUntil(), u.isMustChangePassword()))
+                .toList(), params);
+    }
+
+    @PostMapping("/users/{username}/unlock")
+    @Operation(summary = "Unlock an account locked by failed logins")
+    public Map<String, Object> unlock(@PathVariable String username) {
+        accountService.unlock(username);
+        return Map.of("username", username, "unlocked", true);
+    }
+
+    @PostMapping("/users/{username}/reset-password")
+    @Operation(summary = "Issue a new temporary password", description = "Shown once; the user must change it at next login.")
+    public PasswordResetResponse resetPassword(@PathVariable String username) {
+        return new PasswordResetResponse(username, accountService.resetPassword(username));
+    }
+
+    // ----- Students -----
+
     @GetMapping("/students")
-    public ResponseEntity<?> listStudents() {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (!isAdmin(auth)) {
-            LOGGER.warn("Unauthorized attempt to list students by {}", auth != null ? auth.getName() : "anonymous");
-            return error(HttpStatus.FORBIDDEN, ErrorCode.ADMIN_FORBIDDEN);
-        }
-        try {
-            List<StudentResponse> response = studentService.listStudents().stream()
-                    .map(DOMAIN_TO_RESPONSE_MAPPER_INSTANCE::studentDomainToResponse)
-                    .collect(Collectors.toList());
-            return ResponseEntity.ok(response);
-        } catch (ErpException ex) {
-            LOGGER.error("Business error while listing students: {}", ex.getErrorCode().getCode(), ex);
-            return from(ex);
-        } catch (Exception ex) {
-            LOGGER.error("Unexpected error while listing students", ex);
-            return error(HttpStatus.INTERNAL_SERVER_ERROR, ErrorCode.STUDENT_FETCH_FAILED);
-        }
+    public PageResponse<StudentResponse> listStudents(@ParameterObject ListParams params) {
+        return paging.page(studentService.listStudents().stream()
+                .map(DOMAIN_TO_RESPONSE_MAPPER_INSTANCE::studentDomainToResponse)
+                .toList(), params);
     }
 
     @PostMapping("/create/student")
-    public ResponseEntity<?> createStudentUser(@RequestBody StudentCreateRequest studentCreateRequest) {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (!isAdmin(auth)) {
-            LOGGER.warn("Unauthorized attempt to create student by {}", auth != null ? auth.getName() : "anonymous");
-            return error(HttpStatus.FORBIDDEN, ErrorCode.ADMIN_FORBIDDEN);
-        }
-
-        Integer rollNo = studentCreateRequest.rollNo();
-        try {
-            CreateUserDomain created = studentService.createStudentUser(
-                    REQUEST_TO_DOMAIN_MAPPER_INSTANCE.studentUserRequestToDomain(studentCreateRequest)
-            );
-            CreateUserResponse response = DOMAIN_TO_RESPONSE_MAPPER_INSTANCE.domainToCreateUserResponse(created);
-            LOGGER.info("Admin {} created student user for roll {}", auth.getName(), rollNo);
-            return ResponseEntity.status(HttpStatus.CREATED).body(response);
-        } catch (ErpException ex) {
-            LOGGER.error("Business error while creating student {}: {}", rollNo, ex.getErrorCode().getCode(), ex);
-            return from(ex);
-        } catch (Exception ex) {
-            LOGGER.error("Unexpected error while creating student {}", rollNo, ex);
-            return error(HttpStatus.INTERNAL_SERVER_ERROR, ErrorCode.USER_CREATION_FAILED);
-        }
+    @ResponseStatus(HttpStatus.CREATED)
+    @Operation(summary = "Create a student login + profile", description = "The response contains a one-time temporaryPassword.")
+    public CreateUserResponse createStudentUser(@RequestBody StudentCreateRequest request) {
+        CreateUserDomain created = studentService.createStudentUser(
+                REQUEST_TO_DOMAIN_MAPPER_INSTANCE.studentUserRequestToDomain(request));
+        LOGGER.info("Created student user {} for roll {}", created.getUsername(), request.rollNo());
+        return DOMAIN_TO_RESPONSE_MAPPER_INSTANCE.domainToCreateUserResponse(created);
     }
 
     @PutMapping("/student/{rollNo}")
-    public ResponseEntity<?> updateStudentUser(@PathVariable String rollNo,
-                                               @RequestBody StudentUpdateRequest request) {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (!isAdmin(auth)) {
-            LOGGER.warn("Unauthorized attempt to update student by {}", auth != null ? auth.getName() : "anonymous");
-            return error(HttpStatus.FORBIDDEN, ErrorCode.ADMIN_FORBIDDEN);
-        }
-
-        StudentUserDomain domain = REQUEST_TO_DOMAIN_MAPPER_INSTANCE.studentUpdateRequestToDomain(request)
-                .withRollNo(rollNo);
-
-        try {
-            StudentUserDomain updated = studentService.updateStudentUser(domain);
-            StudentResponse response = DOMAIN_TO_RESPONSE_MAPPER_INSTANCE.studentDomainToResponse(updated);
-            return ResponseEntity.ok(response);
-        } catch (ErpException ex) {
-            LOGGER.error("Business error while updating student {}: {}", rollNo, ex.getErrorCode().getCode(), ex);
-            return from(ex);
-        } catch (Exception ex) {
-            LOGGER.error("Unexpected error while updating student {}", rollNo, ex);
-            return error(HttpStatus.INTERNAL_SERVER_ERROR, ErrorCode.STUDENT_UPDATE_FAILED);
-        }
+    public StudentResponse updateStudentUser(@PathVariable String rollNo, @RequestBody StudentUpdateRequest request) {
+        StudentUserDomain domain = REQUEST_TO_DOMAIN_MAPPER_INSTANCE.studentUpdateRequestToDomain(request).withRollNo(rollNo);
+        return DOMAIN_TO_RESPONSE_MAPPER_INSTANCE.studentDomainToResponse(studentService.updateStudentUser(domain));
     }
 
     @DeleteMapping("/student/{rollNo}")
-    public ResponseEntity<?> deleteStudentUser(@PathVariable String rollNo) {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (!isAdmin(auth)) {
-            LOGGER.warn("Unauthorized attempt to delete student by {}", auth != null ? auth.getName() : "anonymous");
-            return error(HttpStatus.FORBIDDEN, ErrorCode.ADMIN_FORBIDDEN);
-        }
-
-        try {
-            boolean deleted = studentService.deleteStudentUser(rollNo);
-            return ResponseEntity.ok(Map.of("deleted", deleted, "rollNo", rollNo));
-        } catch (ErpException ex) {
-            LOGGER.error("Business error while deleting student {}: {}", rollNo, ex.getErrorCode().getCode(), ex);
-            return from(ex);
-        } catch (Exception ex) {
-            LOGGER.error("Unexpected error while deleting student {}", rollNo, ex);
-            return error(HttpStatus.INTERNAL_SERVER_ERROR, ErrorCode.STUDENT_DELETE_FAILED);
-        }
+    public Map<String, Object> deleteStudentUser(@PathVariable String rollNo) {
+        return Map.of("deleted", studentService.deleteStudentUser(rollNo), "rollNo", rollNo);
     }
 
-    // ----- Instructor listing + CRUD -----
-    @GetMapping("/instructors")
-    public ResponseEntity<?> listInstructors() {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (!isAdmin(auth)) {
-            LOGGER.warn("Unauthorized attempt to list instructors by {}", auth != null ? auth.getName() : "anonymous");
-            return error(HttpStatus.FORBIDDEN, ErrorCode.ADMIN_FORBIDDEN);
-        }
+    // ----- Instructors -----
 
-        try {
-            List<InstructorResponse> response = instructorService.listInstructors().stream()
-                    .map(DOMAIN_TO_RESPONSE_MAPPER_INSTANCE::instructorDomainToResponse)
-                    .collect(Collectors.toList());
-            return ResponseEntity.ok(response);
-        } catch (ErpException ex) {
-            LOGGER.error("Business error while listing instructors: {}", ex.getErrorCode().getCode(), ex);
-            return from(ex);
-        } catch (Exception ex) {
-            LOGGER.error("Unexpected error while listing instructors", ex);
-            return error(HttpStatus.INTERNAL_SERVER_ERROR, ErrorCode.INSTRUCTOR_FETCH_FAILED);
-        }
+    @GetMapping("/instructors")
+    public PageResponse<InstructorResponse> listInstructors(@ParameterObject ListParams params) {
+        return paging.page(instructorService.listInstructors().stream()
+                .map(DOMAIN_TO_RESPONSE_MAPPER_INSTANCE::instructorDomainToResponse)
+                .toList(), params);
     }
 
     @PostMapping("/create/instructor")
-    public ResponseEntity<?> createInstructor(@RequestBody InstructorCreateRequest request) {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (!isAdmin(auth)) {
-            LOGGER.warn("Unauthorized attempt to create instructor by {}", auth != null ? auth.getName() : "anonymous");
-            return error(HttpStatus.FORBIDDEN, ErrorCode.ADMIN_FORBIDDEN);
-        }
-
-        InstructorDomain domain = REQUEST_TO_DOMAIN_MAPPER_INSTANCE.instructorCreateRequestToDomain(request);
-
-        try {
-            CreateUserDomain created = instructorService.createInstructor(domain);
-            CreateUserResponse response = DOMAIN_TO_RESPONSE_MAPPER_INSTANCE.domainToCreateUserResponse(created);
-            LOGGER.info("Admin {} created instructor {}", auth.getName(), request.instructorCode());
-            return ResponseEntity.status(HttpStatus.CREATED).body(response);
-        } catch (ErpException ex) {
-            LOGGER.error("Business error while creating instructor {}: {}", request.instructorCode(), ex.getErrorCode().getCode(), ex);
-            return from(ex);
-        } catch (Exception ex) {
-            LOGGER.error("Unexpected error while creating instructor {}", request.instructorCode(), ex);
-            return error(HttpStatus.INTERNAL_SERVER_ERROR, ErrorCode.INSTRUCTOR_CREATE_FAILED);
-        }
+    @ResponseStatus(HttpStatus.CREATED)
+    @Operation(summary = "Create an instructor login + profile", description = "The response contains a one-time temporaryPassword.")
+    public CreateUserResponse createInstructor(@RequestBody InstructorCreateRequest request) {
+        CreateUserDomain created = instructorService.createInstructor(
+                REQUEST_TO_DOMAIN_MAPPER_INSTANCE.instructorCreateRequestToDomain(request));
+        LOGGER.info("Created instructor {} with username {}", request.instructorCode(), created.getUsername());
+        return DOMAIN_TO_RESPONSE_MAPPER_INSTANCE.domainToCreateUserResponse(created);
     }
 
     @PutMapping("/instructor/{instructorCode}")
-    public ResponseEntity<?> updateInstructor(@PathVariable String instructorCode,
-                                              @RequestBody InstructorUpdateRequest request) {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (!isAdmin(auth)) {
-            LOGGER.warn("Unauthorized attempt to update instructor by {}", auth != null ? auth.getName() : "anonymous");
-            return error(HttpStatus.FORBIDDEN, ErrorCode.ADMIN_FORBIDDEN);
-        }
-
+    public InstructorResponse updateInstructor(@PathVariable String instructorCode,
+                                               @RequestBody InstructorUpdateRequest request) {
         InstructorDomain domain = REQUEST_TO_DOMAIN_MAPPER_INSTANCE.instructorUpdateRequestToDomain(request)
                 .withInstructorCode(instructorCode);
-
-        try {
-            InstructorResponse response = DOMAIN_TO_RESPONSE_MAPPER_INSTANCE
-                    .instructorDomainToResponse(instructorService.updateInstructor(domain));
-            return ResponseEntity.ok(response);
-        } catch (ErpException ex) {
-            LOGGER.error("Business error while updating instructor {}: {}", instructorCode, ex.getErrorCode().getCode(), ex);
-            return from(ex);
-        } catch (Exception ex) {
-            LOGGER.error("Unexpected error while updating instructor {}", instructorCode, ex);
-            return error(HttpStatus.INTERNAL_SERVER_ERROR, ErrorCode.INSTRUCTOR_UPDATE_FAILED);
-        }
+        return DOMAIN_TO_RESPONSE_MAPPER_INSTANCE.instructorDomainToResponse(instructorService.updateInstructor(domain));
     }
 
     @DeleteMapping("/instructor/{instructorCode}")
-    public ResponseEntity<?> deleteInstructor(@PathVariable String instructorCode) {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (!isAdmin(auth)) {
-            LOGGER.warn("Unauthorized attempt to delete instructor by {}", auth != null ? auth.getName() : "anonymous");
-            return error(HttpStatus.FORBIDDEN, ErrorCode.ADMIN_FORBIDDEN);
-        }
-
-        try {
-            boolean deleted = instructorService.deleteInstructor(instructorCode);
-            return ResponseEntity.ok(Map.of("deleted", deleted, "instructorCode", instructorCode));
-        } catch (ErpException ex) {
-            LOGGER.error("Business error while deleting instructor {}: {}", instructorCode, ex.getErrorCode().getCode(), ex);
-            return from(ex);
-        } catch (Exception ex) {
-            LOGGER.error("Unexpected error while deleting instructor {}", instructorCode, ex);
-            return error(HttpStatus.INTERNAL_SERVER_ERROR, ErrorCode.INSTRUCTOR_DELETE_FAILED);
-        }
+    public Map<String, Object> deleteInstructor(@PathVariable String instructorCode) {
+        return Map.of("deleted", instructorService.deleteInstructor(instructorCode), "instructorCode", instructorCode);
     }
 
-    // ----- Program listing + CRUD -----
-    @GetMapping("/programs")
-    public ResponseEntity<?> listPrograms() {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (!isAdmin(auth)) {
-            LOGGER.warn("Unauthorized attempt to list programs by {}", auth != null ? auth.getName() : "anonymous");
-            return error(HttpStatus.FORBIDDEN, ErrorCode.ADMIN_FORBIDDEN);
-        }
+    // ----- Programs -----
 
-        try {
-            List<ProgramResponse> response = programService.listPrograms().stream()
-                    .map(DOMAIN_TO_RESPONSE_MAPPER_INSTANCE::programDomainToResponse)
-                    .collect(Collectors.toList());
-            return ResponseEntity.ok(response);
-        } catch (ErpException ex) {
-            LOGGER.error("Business error while listing programs: {}", ex.getErrorCode().getCode(), ex);
-            return from(ex);
-        } catch (Exception ex) {
-            LOGGER.error("Unexpected error while listing programs", ex);
-            return error(HttpStatus.INTERNAL_SERVER_ERROR, ErrorCode.PROGRAM_FETCH_FAILED);
-        }
+    @GetMapping("/programs")
+    public PageResponse<ProgramResponse> listPrograms(@ParameterObject ListParams params) {
+        return paging.page(programService.listPrograms().stream()
+                .map(DOMAIN_TO_RESPONSE_MAPPER_INSTANCE::programDomainToResponse)
+                .toList(), params);
     }
 
     @PostMapping("/programs")
-    public ResponseEntity<?> createProgram(@RequestBody ProgramCreateRequest request) {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (!isAdmin(auth)) {
-            LOGGER.warn("Unauthorized attempt to create program by {}", auth != null ? auth.getName() : "anonymous");
-            return error(HttpStatus.FORBIDDEN, ErrorCode.ADMIN_FORBIDDEN);
-        }
-
+    @ResponseStatus(HttpStatus.CREATED)
+    public ProgramResponse createProgram(@RequestBody ProgramCreateRequest request) {
         ProgramDomain domain = REQUEST_TO_DOMAIN_MAPPER_INSTANCE.programCreateRequestToDomain(request);
-
-        try {
-            ProgramResponse response = DOMAIN_TO_RESPONSE_MAPPER_INSTANCE
-                    .programDomainToResponse(programService.createProgram(domain));
-            return ResponseEntity.status(HttpStatus.CREATED).body(response);
-        } catch (ErpException ex) {
-            LOGGER.error("Business error while creating program {}: {}", request.programId(), ex.getErrorCode().getCode(), ex);
-            return from(ex);
-        } catch (Exception ex) {
-            LOGGER.error("Unexpected error while creating program {}", request.programId(), ex);
-            return error(HttpStatus.INTERNAL_SERVER_ERROR, ErrorCode.PROGRAM_CREATE_FAILED);
-        }
+        return DOMAIN_TO_RESPONSE_MAPPER_INSTANCE.programDomainToResponse(programService.createProgram(domain));
     }
 
     @PutMapping("/programs/{programId}")
-    public ResponseEntity<?> updateProgram(@PathVariable String programId,
-                                           @RequestBody ProgramUpdateRequest request) {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (!isAdmin(auth)) {
-            LOGGER.warn("Unauthorized attempt to update program by {}", auth != null ? auth.getName() : "anonymous");
-            return error(HttpStatus.FORBIDDEN, ErrorCode.ADMIN_FORBIDDEN);
-        }
-
-        ProgramDomain domain = REQUEST_TO_DOMAIN_MAPPER_INSTANCE.programUpdateRequestToDomain(request)
-                .withProgramId(programId);
-
-        try {
-            ProgramResponse response = DOMAIN_TO_RESPONSE_MAPPER_INSTANCE
-                    .programDomainToResponse(programService.updateProgram(domain));
-            return ResponseEntity.ok(response);
-        } catch (ErpException ex) {
-            LOGGER.error("Business error while updating program {}: {}", programId, ex.getErrorCode().getCode(), ex);
-            return from(ex);
-        } catch (Exception ex) {
-            LOGGER.error("Unexpected error while updating program {}", programId, ex);
-            return error(HttpStatus.INTERNAL_SERVER_ERROR, ErrorCode.PROGRAM_UPDATE_FAILED);
-        }
+    public ProgramResponse updateProgram(@PathVariable String programId, @RequestBody ProgramUpdateRequest request) {
+        ProgramDomain domain = REQUEST_TO_DOMAIN_MAPPER_INSTANCE.programUpdateRequestToDomain(request).withProgramId(programId);
+        return DOMAIN_TO_RESPONSE_MAPPER_INSTANCE.programDomainToResponse(programService.updateProgram(domain));
     }
 
     @DeleteMapping("/programs/{programId}")
-    public ResponseEntity<?> deleteProgram(@PathVariable String programId) {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (!isAdmin(auth)) {
-            LOGGER.warn("Unauthorized attempt to delete program by {}", auth != null ? auth.getName() : "anonymous");
-            return error(HttpStatus.FORBIDDEN, ErrorCode.ADMIN_FORBIDDEN);
-        }
-
-        try {
-            boolean deleted = programService.deleteProgram(programId);
-            return ResponseEntity.ok(Map.of("deleted", deleted, "programId", programId));
-        } catch (ErpException ex) {
-            LOGGER.error("Business error while deleting program {}: {}", programId, ex.getErrorCode().getCode(), ex);
-            return from(ex);
-        } catch (Exception ex) {
-            LOGGER.error("Unexpected error while deleting program {}", programId, ex);
-            return error(HttpStatus.INTERNAL_SERVER_ERROR, ErrorCode.PROGRAM_DELETE_FAILED);
-        }
+    public Map<String, Object> deleteProgram(@PathVariable String programId) {
+        return Map.of("deleted", programService.deleteProgram(programId), "programId", programId);
     }
 
-    // ----- Department listing + CRUD -----
-    @GetMapping("/departments")
-    public ResponseEntity<?> listDepartments() {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (!isAdmin(auth)) {
-            LOGGER.warn("Unauthorized attempt to list departments by {}", auth != null ? auth.getName() : "anonymous");
-            return error(HttpStatus.FORBIDDEN, ErrorCode.ADMIN_FORBIDDEN);
-        }
+    // ----- Departments -----
 
-        try {
-            List<DepartmentResponse> response = departmentService.listDepartments().stream()
-                    .map(DOMAIN_TO_RESPONSE_MAPPER_INSTANCE::departmentDomainToResponse)
-                    .collect(Collectors.toList());
-            return ResponseEntity.ok(response);
-        } catch (ErpException ex) {
-            LOGGER.error("Business error while listing departments: {}", ex.getErrorCode().getCode(), ex);
-            return from(ex);
-        } catch (Exception ex) {
-            LOGGER.error("Unexpected error while listing departments", ex);
-            return error(HttpStatus.INTERNAL_SERVER_ERROR, ErrorCode.DEPARTMENT_FETCH_FAILED);
-        }
+    @GetMapping("/departments")
+    public PageResponse<DepartmentResponse> listDepartments(@ParameterObject ListParams params) {
+        return paging.page(departmentService.listDepartments().stream()
+                .map(DOMAIN_TO_RESPONSE_MAPPER_INSTANCE::departmentDomainToResponse)
+                .toList(), params);
     }
 
     @PostMapping("/departments")
-    public ResponseEntity<?> createDepartment(@RequestBody DepartmentCreateRequest request) {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (!isAdmin(auth)) {
-            LOGGER.warn("Unauthorized attempt to create department by {}", auth != null ? auth.getName() : "anonymous");
-            return error(HttpStatus.FORBIDDEN, ErrorCode.ADMIN_FORBIDDEN);
-        }
-
+    @ResponseStatus(HttpStatus.CREATED)
+    public DepartmentResponse createDepartment(@RequestBody DepartmentCreateRequest request) {
         DepartmentDomain domain = REQUEST_TO_DOMAIN_MAPPER_INSTANCE.departmentCreateRequestToDomain(request);
-
-        try {
-            DepartmentResponse response = DOMAIN_TO_RESPONSE_MAPPER_INSTANCE
-                    .departmentDomainToResponse(departmentService.createDepartment(domain));
-            return ResponseEntity.status(HttpStatus.CREATED).body(response);
-        } catch (ErpException ex) {
-            LOGGER.error("Business error while creating department {}: {}", request.deptId(), ex.getErrorCode().getCode(), ex);
-            return from(ex);
-        } catch (Exception ex) {
-            LOGGER.error("Unexpected error while creating department {}", request.deptId(), ex);
-            return error(HttpStatus.INTERNAL_SERVER_ERROR, ErrorCode.DEPARTMENT_CREATE_FAILED);
-        }
+        return DOMAIN_TO_RESPONSE_MAPPER_INSTANCE.departmentDomainToResponse(departmentService.createDepartment(domain));
     }
 
     @PutMapping("/departments/{deptId}")
-    public ResponseEntity<?> updateDepartment(@PathVariable String deptId,
-                                              @RequestBody DepartmentUpdateRequest request) {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (!isAdmin(auth)) {
-            LOGGER.warn("Unauthorized attempt to update department by {}", auth != null ? auth.getName() : "anonymous");
-            return error(HttpStatus.FORBIDDEN, ErrorCode.ADMIN_FORBIDDEN);
-        }
-
-        DepartmentDomain domain = REQUEST_TO_DOMAIN_MAPPER_INSTANCE.departmentUpdateRequestToDomain(request)
-                .withDeptId(deptId);
-
-        try {
-            DepartmentResponse response = DOMAIN_TO_RESPONSE_MAPPER_INSTANCE
-                    .departmentDomainToResponse(departmentService.updateDepartment(domain));
-            return ResponseEntity.ok(response);
-        } catch (ErpException ex) {
-            LOGGER.error("Business error while updating department {}: {}", deptId, ex.getErrorCode().getCode(), ex);
-            return from(ex);
-        } catch (Exception ex) {
-            LOGGER.error("Unexpected error while updating department {}", deptId, ex);
-            return error(HttpStatus.INTERNAL_SERVER_ERROR, ErrorCode.DEPARTMENT_UPDATE_FAILED);
-        }
+    public DepartmentResponse updateDepartment(@PathVariable String deptId, @RequestBody DepartmentUpdateRequest request) {
+        DepartmentDomain domain = REQUEST_TO_DOMAIN_MAPPER_INSTANCE.departmentUpdateRequestToDomain(request).withDeptId(deptId);
+        return DOMAIN_TO_RESPONSE_MAPPER_INSTANCE.departmentDomainToResponse(departmentService.updateDepartment(domain));
     }
 
     @DeleteMapping("/departments/{deptId}")
-    public ResponseEntity<?> deleteDepartment(@PathVariable String deptId) {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (!isAdmin(auth)) {
-            LOGGER.warn("Unauthorized attempt to delete department by {}", auth != null ? auth.getName() : "anonymous");
-            return error(HttpStatus.FORBIDDEN, ErrorCode.ADMIN_FORBIDDEN);
-        }
-
-        try {
-            boolean deleted = departmentService.deleteDepartment(deptId);
-            return ResponseEntity.ok(Map.of("deleted", deleted, "deptId", deptId));
-        } catch (ErpException ex) {
-            LOGGER.error("Business error while deleting department {}: {}", deptId, ex.getErrorCode().getCode(), ex);
-            return from(ex);
-        } catch (Exception ex) {
-            LOGGER.error("Unexpected error while deleting department {}", deptId, ex);
-            return error(HttpStatus.INTERNAL_SERVER_ERROR, ErrorCode.DEPARTMENT_DELETE_FAILED);
-        }
+    public Map<String, Object> deleteDepartment(@PathVariable String deptId) {
+        return Map.of("deleted", departmentService.deleteDepartment(deptId), "deptId", deptId);
     }
 
-    // ----- Course listing + CRUD -----
-    @GetMapping("/courses")
-    public ResponseEntity<?> listCourses() {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (!isAdmin(auth)) {
-            LOGGER.warn("Unauthorized attempt to list courses by {}", auth != null ? auth.getName() : "anonymous");
-            return error(HttpStatus.FORBIDDEN, ErrorCode.ADMIN_FORBIDDEN);
-        }
+    // ----- Courses -----
 
-        try {
-            List<CourseResponse> response = courseService.listCourses().stream()
-                    .map(DOMAIN_TO_RESPONSE_MAPPER_INSTANCE::courseDomainToResponse)
-                    .collect(Collectors.toList());
-            return ResponseEntity.ok(response);
-        } catch (ErpException ex) {
-            LOGGER.error("Business error while listing courses: {}", ex.getErrorCode().getCode(), ex);
-            return from(ex);
-        } catch (Exception ex) {
-            LOGGER.error("Unexpected error while listing courses", ex);
-            return error(HttpStatus.INTERNAL_SERVER_ERROR, ErrorCode.COURSE_FETCH_FAILED);
-        }
+    @GetMapping("/courses")
+    public PageResponse<CourseResponse> listCourses(@ParameterObject ListParams params) {
+        return paging.page(courseService.listCourses().stream()
+                .map(DOMAIN_TO_RESPONSE_MAPPER_INSTANCE::courseDomainToResponse)
+                .toList(), params);
     }
 
     @PostMapping("/courses")
-    public ResponseEntity<?> createCourse(@RequestBody CourseCreateRequest request) {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (!isAdmin(auth)) {
-            LOGGER.warn("Unauthorized attempt to create course by {}", auth != null ? auth.getName() : "anonymous");
-            return error(HttpStatus.FORBIDDEN, ErrorCode.ADMIN_FORBIDDEN);
-        }
-
+    @ResponseStatus(HttpStatus.CREATED)
+    public CourseResponse createCourse(@RequestBody CourseCreateRequest request) {
         CourseDomain domain = REQUEST_TO_DOMAIN_MAPPER_INSTANCE.courseCreateRequestToDomain(request);
-
-        try {
-            CourseResponse response = DOMAIN_TO_RESPONSE_MAPPER_INSTANCE
-                    .courseDomainToResponse(courseService.createCourse(domain));
-            return ResponseEntity.status(HttpStatus.CREATED).body(response);
-        } catch (ErpException ex) {
-            LOGGER.error("Business error while creating course {}: {}", request.courseId(), ex.getErrorCode().getCode(), ex);
-            return from(ex);
-        } catch (Exception ex) {
-            LOGGER.error("Unexpected error while creating course {}", request.courseId(), ex);
-            return error(HttpStatus.INTERNAL_SERVER_ERROR, ErrorCode.COURSE_CREATE_FAILED);
-        }
+        return DOMAIN_TO_RESPONSE_MAPPER_INSTANCE.courseDomainToResponse(courseService.createCourse(domain));
     }
 
     @PutMapping("/courses/{courseId}")
-    public ResponseEntity<?> updateCourse(@PathVariable String courseId,
-                                          @RequestBody CourseUpdateRequest request) {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (!isAdmin(auth)) {
-            LOGGER.warn("Unauthorized attempt to update course by {}", auth != null ? auth.getName() : "anonymous");
-            return error(HttpStatus.FORBIDDEN, ErrorCode.ADMIN_FORBIDDEN);
-        }
-
-        CourseDomain domain = REQUEST_TO_DOMAIN_MAPPER_INSTANCE.courseUpdateRequestToDomain(request)
-                .withCourseId(courseId);
-
-        try {
-            CourseResponse response = DOMAIN_TO_RESPONSE_MAPPER_INSTANCE
-                    .courseDomainToResponse(courseService.updateCourse(domain));
-            return ResponseEntity.ok(response);
-        } catch (ErpException ex) {
-            LOGGER.error("Business error while updating course {}: {}", courseId, ex.getErrorCode().getCode(), ex);
-            return from(ex);
-        } catch (Exception ex) {
-            LOGGER.error("Unexpected error while updating course {}", courseId, ex);
-            return error(HttpStatus.INTERNAL_SERVER_ERROR, ErrorCode.COURSE_UPDATE_FAILED);
-        }
+    public CourseResponse updateCourse(@PathVariable String courseId, @RequestBody CourseUpdateRequest request) {
+        CourseDomain domain = REQUEST_TO_DOMAIN_MAPPER_INSTANCE.courseUpdateRequestToDomain(request).withCourseId(courseId);
+        return DOMAIN_TO_RESPONSE_MAPPER_INSTANCE.courseDomainToResponse(courseService.updateCourse(domain));
     }
 
     @DeleteMapping("/courses/{courseId}")
-    public ResponseEntity<?> deleteCourse(@PathVariable String courseId) {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (!isAdmin(auth)) {
-            LOGGER.warn("Unauthorized attempt to delete course by {}", auth != null ? auth.getName() : "anonymous");
-            return error(HttpStatus.FORBIDDEN, ErrorCode.ADMIN_FORBIDDEN);
-        }
-
-        try {
-            boolean deleted = courseService.deleteCourse(courseId);
-            return ResponseEntity.ok(Map.of("deleted", deleted, "courseId", courseId));
-        } catch (ErpException ex) {
-            LOGGER.error("Business error while deleting course {}: {}", courseId, ex.getErrorCode().getCode(), ex);
-            return from(ex);
-        } catch (Exception ex) {
-            LOGGER.error("Unexpected error while deleting course {}", courseId, ex);
-            return error(HttpStatus.INTERNAL_SERVER_ERROR, ErrorCode.COURSE_DELETE_FAILED);
-        }
+    public Map<String, Object> deleteCourse(@PathVariable String courseId) {
+        return Map.of("deleted", courseService.deleteCourse(courseId), "courseId", courseId);
     }
 
+    // ----- Rooms -----
 
-    // ----- Room listing + CRUD -----
     @GetMapping("/rooms")
-    public ResponseEntity<?> listRooms() {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (!isAdmin(auth)) {
-            LOGGER.warn("Unauthorized attempt to list rooms by {}", auth != null ? auth.getName() : "anonymous");
-            return error(HttpStatus.FORBIDDEN, ErrorCode.ADMIN_FORBIDDEN);
-        }
-        try {
-            List<RoomResponse> response = roomService.listRooms().stream()
-                    .map(DOMAIN_TO_RESPONSE_MAPPER_INSTANCE::roomDomainToResponse)
-                    .collect(Collectors.toList());
-            return ResponseEntity.ok(response);
-        } catch (ErpException ex) {
-            LOGGER.error("Business error while listing rooms: {}", ex.getErrorCode().getCode(), ex);
-            return from(ex);
-        } catch (Exception ex) {
-            LOGGER.error("Unexpected error while listing rooms", ex);
-            return error(HttpStatus.INTERNAL_SERVER_ERROR, ErrorCode.ROOM_FETCH_FAILED);
-        }
+    public PageResponse<RoomResponse> listRooms(@ParameterObject ListParams params) {
+        return paging.page(roomService.listRooms().stream()
+                .map(DOMAIN_TO_RESPONSE_MAPPER_INSTANCE::roomDomainToResponse)
+                .toList(), params);
     }
 
     @PostMapping("/rooms")
-    public ResponseEntity<?> createRoom(@RequestBody RoomCreateRequest request) {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (!isAdmin(auth)) {
-            LOGGER.warn("Unauthorized attempt to create room by {}", auth != null ? auth.getName() : "anonymous");
-            return error(HttpStatus.FORBIDDEN, ErrorCode.ADMIN_FORBIDDEN);
-        }
-
+    @ResponseStatus(HttpStatus.CREATED)
+    public RoomResponse createRoom(@RequestBody RoomCreateRequest request) {
         RoomDomain domain = REQUEST_TO_DOMAIN_MAPPER_INSTANCE.roomCreateRequestToDomain(request);
-        try {
-            RoomResponse response = DOMAIN_TO_RESPONSE_MAPPER_INSTANCE
-                    .roomDomainToResponse(roomService.createRoom(domain));
-            return ResponseEntity.status(HttpStatus.CREATED).body(response);
-        } catch (ErpException ex) {
-            LOGGER.error("Business error while creating room {}: {}", request.roomId(), ex.getErrorCode().getCode(), ex);
-            return from(ex);
-        } catch (Exception ex) {
-            LOGGER.error("Unexpected error while creating room {}", request.roomId(), ex);
-            return error(HttpStatus.INTERNAL_SERVER_ERROR, ErrorCode.ROOM_CREATE_FAILED);
-        }
+        return DOMAIN_TO_RESPONSE_MAPPER_INSTANCE.roomDomainToResponse(roomService.createRoom(domain));
     }
 
     @PutMapping("/rooms/{roomId}")
-    public ResponseEntity<?> updateRoom(@PathVariable String roomId,
-                                        @RequestBody RoomUpdateRequest request) {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (!isAdmin(auth)) {
-            LOGGER.warn("Unauthorized attempt to update room by {}", auth != null ? auth.getName() : "anonymous");
-            return error(HttpStatus.FORBIDDEN, ErrorCode.ADMIN_FORBIDDEN);
-        }
-
-        RoomDomain domain = REQUEST_TO_DOMAIN_MAPPER_INSTANCE.roomUpdateRequestToDomain(request)
-                .withRoomId(roomId);
-
-        try {
-            RoomResponse response = DOMAIN_TO_RESPONSE_MAPPER_INSTANCE
-                    .roomDomainToResponse(roomService.updateRoom(domain));
-            return ResponseEntity.ok(response);
-        } catch (ErpException ex) {
-            LOGGER.error("Business error while updating room {}: {}", roomId, ex.getErrorCode().getCode(), ex);
-            return from(ex);
-        } catch (Exception ex) {
-            LOGGER.error("Unexpected error while updating room {}", roomId, ex);
-            return error(HttpStatus.INTERNAL_SERVER_ERROR, ErrorCode.ROOM_UPDATE_FAILED);
-        }
+    public RoomResponse updateRoom(@PathVariable String roomId, @RequestBody RoomUpdateRequest request) {
+        RoomDomain domain = REQUEST_TO_DOMAIN_MAPPER_INSTANCE.roomUpdateRequestToDomain(request).withRoomId(roomId);
+        return DOMAIN_TO_RESPONSE_MAPPER_INSTANCE.roomDomainToResponse(roomService.updateRoom(domain));
     }
 
     @DeleteMapping("/rooms/{roomId}")
-    public ResponseEntity<?> deleteRoom(@PathVariable String roomId) {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (!isAdmin(auth)) {
-            LOGGER.warn("Unauthorized attempt to delete room by {}", auth != null ? auth.getName() : "anonymous");
-            return error(HttpStatus.FORBIDDEN, ErrorCode.ADMIN_FORBIDDEN);
-        }
-
-        try {
-            boolean deleted = roomService.deleteRoom(roomId);
-            return ResponseEntity.ok(Map.of("deleted", deleted, "roomId", roomId));
-        } catch (ErpException ex) {
-            LOGGER.error("Business error while deleting room {}: {}", roomId, ex.getErrorCode().getCode(), ex);
-            return from(ex);
-        } catch (Exception ex) {
-            LOGGER.error("Unexpected error while deleting room {}", roomId, ex);
-            return error(HttpStatus.INTERNAL_SERVER_ERROR, ErrorCode.ROOM_DELETE_FAILED);
-        }
-    }
-
-    @GetMapping("/settings/maintenance")
-    public ResponseEntity<?> maintenanceStatus() {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (!isAdmin(auth)) {
-            return error(HttpStatus.FORBIDDEN, ErrorCode.ADMIN_FORBIDDEN);
-        }
-        try {
-            MaintenanceState state = maintenanceService.status();
-            return ResponseEntity.ok(new MaintenanceStatusResponse(state.maintenanceOn(), state.bannerMessage()));
-        } catch (ErpException ex) {
-            return from(ex);
-        } catch (Exception ex) {
-            LOGGER.error("Unexpected maintenance status failure", ex);
-            return error(HttpStatus.INTERNAL_SERVER_ERROR, ErrorCode.MAINTENANCE_STATUS_FETCH_FAILED);
-        }
-    }
-
-    @PutMapping("/settings/maintenance")
-    public ResponseEntity<?> toggleMaintenance(@RequestBody @Valid MaintenanceToggleRequest request) {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (!isAdmin(auth)) {
-            return error(HttpStatus.FORBIDDEN, ErrorCode.ADMIN_FORBIDDEN);
-        }
-        try {
-            MaintenanceState state = maintenanceService.updateMaintenanceMode(request.maintenanceOn());
-            LOGGER.info("Admin {} set maintenance mode to {}", auth.getName(), state.maintenanceOn());
-            return ResponseEntity.ok(new MaintenanceStatusResponse(state.maintenanceOn(), state.bannerMessage()));
-        } catch (ErpException ex) {
-            return from(ex);
-        } catch (Exception ex) {
-            LOGGER.error("Unexpected maintenance toggle failure", ex);
-            return error(HttpStatus.INTERNAL_SERVER_ERROR, ErrorCode.MAINTENANCE_UPDATE_FAILED);
-        }
-    }
-
-    @GetMapping("/courses/{courseId}/sections")
-    public ResponseEntity<?> listSections(@PathVariable String courseId,
-                                          @RequestParam(required = false) String semester,
-                                          @RequestParam(required = false) Integer year) {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (!isAdmin(auth)) {
-            return error(HttpStatus.FORBIDDEN, ErrorCode.ADMIN_FORBIDDEN);
-        }
-        try {
-            List<SectionResponse> response = sectionService.listSections(courseId, semester, year).stream()
-                    .map(DOMAIN_TO_RESPONSE_MAPPER_INSTANCE::sectionDomainToResponse)
-                    .toList();
-            return ResponseEntity.ok(response);
-        } catch (ErpException ex) {
-            return from(ex);
-        }
-    }
-
-    @PostMapping("/courses/{courseId}/sections")
-    public ResponseEntity<?> createSection(@PathVariable String courseId,
-                                           @RequestBody @Valid SectionCreateRequest request) {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (!isAdmin(auth)) {
-            return error(HttpStatus.FORBIDDEN, ErrorCode.ADMIN_FORBIDDEN);
-        }
-        try {
-            SectionDomain created = sectionService.createSection(courseId, REQUEST_TO_DOMAIN_MAPPER_INSTANCE.sectionCreateRequestToDomain(request));
-            return ResponseEntity.status(HttpStatus.CREATED)
-                    .body(DOMAIN_TO_RESPONSE_MAPPER_INSTANCE.sectionDomainToResponse(created));
-        } catch (ErpException ex) {
-            return from(ex);
-        }
-    }
-
-    @PutMapping("/sections/{sectionId}")
-    public ResponseEntity<?> updateSection(@PathVariable String sectionId,
-                                           @RequestBody @Valid SectionUpdateRequest request) {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (!isAdmin(auth)) {
-            return error(HttpStatus.FORBIDDEN, ErrorCode.ADMIN_FORBIDDEN);
-        }
-        try {
-            SectionDomain updated = sectionService.updateSection(sectionId, REQUEST_TO_DOMAIN_MAPPER_INSTANCE.sectionUpdateRequestToDomain(request));
-            return ResponseEntity.ok(DOMAIN_TO_RESPONSE_MAPPER_INSTANCE.sectionDomainToResponse(updated));
-        } catch (ErpException ex) {
-            return from(ex);
-        }
-    }
-
-    @GetMapping("/sections")
-    public ResponseEntity<?> listAllSections(@RequestParam(required = false) String semester,
-                                             @RequestParam(required = false) Integer year) {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (!isAdmin(auth)) {
-            LOGGER.warn("Unauthorized attempt to list all sections by {}", auth != null ? auth.getName() : "anonymous");
-            return error(HttpStatus.FORBIDDEN, ErrorCode.ADMIN_FORBIDDEN);
-        }
-        try {
-            List<SectionResponse> response = sectionService.listAllSections(semester, year).stream()
-                    .map(DOMAIN_TO_RESPONSE_MAPPER_INSTANCE::sectionDomainToResponse)
-                    .toList();
-            return ResponseEntity.ok(response);
-        } catch (ErpException ex) {
-            LOGGER.error("Business error while listing sections: {}", ex.getErrorCode().getCode(), ex);
-            return from(ex);
-        } catch (Exception ex) {
-            LOGGER.error("Unexpected error while listing sections", ex);
-            return error(HttpStatus.INTERNAL_SERVER_ERROR, ErrorCode.SECTION_LIST_FAILED);
-        }
-    }
-
-    @DeleteMapping("/sections/{sectionId}")
-    public ResponseEntity<?> deleteSection(@PathVariable String sectionId) {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (!isAdmin(auth)) {
-            return error(HttpStatus.FORBIDDEN, ErrorCode.ADMIN_FORBIDDEN);
-        }
-        try {
-            boolean deleted = sectionService.deleteSection(sectionId);
-            return ResponseEntity.ok(Map.of("sectionId", sectionId, "deleted", deleted));
-        } catch (ErpException ex) {
-            return from(ex);
-        }
+    public Map<String, Object> deleteRoom(@PathVariable String roomId) {
+        return Map.of("deleted", roomService.deleteRoom(roomId), "roomId", roomId);
     }
 
     @GetMapping("/rooms/available")
-    public ResponseEntity<?> availableRooms(@RequestParam DayOfWeek day,
-                                            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.TIME) LocalTime start,
-                                            @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.TIME) LocalTime end,
-                                            @RequestParam int minCapacity) {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (!isAdmin(auth)) {
-            return error(HttpStatus.FORBIDDEN, ErrorCode.ADMIN_FORBIDDEN);
-        }
-        try {
-            return ResponseEntity.ok(availabilityService.availableRooms(day, start, end, minCapacity));
-        } catch (ErpException ex) {
-            return from(ex);
-        } catch (Exception ex) {
-            LOGGER.error("Unexpected room availability failure", ex);
-            return error(HttpStatus.INTERNAL_SERVER_ERROR, ErrorCode.ROOM_FETCH_FAILED);
-        }
+    @Operation(summary = "Rooms free for a slot with at least minCapacity seats")
+    public List<RoomAvailabilityResponse> availableRooms(@RequestParam DayOfWeek day,
+                                 @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.TIME) LocalTime start,
+                                 @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.TIME) LocalTime end,
+                                 @RequestParam int minCapacity) {
+        return availabilityService.availableRooms(day, start, end, minCapacity);
     }
 
+    // ----- Maintenance -----
+
+    @GetMapping("/settings/maintenance")
+    public MaintenanceStatusResponse maintenanceStatus() {
+        MaintenanceState state = maintenanceService.status();
+        return new MaintenanceStatusResponse(state.maintenanceOn(), state.bannerMessage());
+    }
+
+    @PutMapping("/settings/maintenance")
+    @Operation(summary = "Turn maintenance (read-only) mode on or off")
+    public MaintenanceStatusResponse toggleMaintenance(@RequestBody @Valid MaintenanceToggleRequest request) {
+        MaintenanceState state = maintenanceService.updateMaintenanceMode(request.maintenanceOn());
+        LOGGER.info("Maintenance mode set to {}", state.maintenanceOn());
+        return new MaintenanceStatusResponse(state.maintenanceOn(), state.bannerMessage());
+    }
+
+    // ----- Sections -----
+
+    @GetMapping("/sections")
+    public PageResponse<SectionResponse> listAllSections(@RequestParam(required = false) String semester,
+                                                         @RequestParam(required = false) Integer year,
+                                                         @ParameterObject ListParams params) {
+        return paging.page(sectionService.listAllSections(semester, year).stream()
+                .map(DOMAIN_TO_RESPONSE_MAPPER_INSTANCE::sectionDomainToResponse)
+                .toList(), params);
+    }
+
+    @GetMapping("/courses/{courseId}/sections")
+    public List<SectionResponse> listSections(@PathVariable String courseId,
+                                              @RequestParam(required = false) String semester,
+                                              @RequestParam(required = false) Integer year) {
+        return sectionService.listSections(courseId, semester, year).stream()
+                .map(DOMAIN_TO_RESPONSE_MAPPER_INSTANCE::sectionDomainToResponse)
+                .toList();
+    }
+
+    @PostMapping("/courses/{courseId}/sections")
+    @ResponseStatus(HttpStatus.CREATED)
+    @Operation(summary = "Create a section", description = "The id is generated as COURSE-INSTRUCTOR-YY-TERM, e.g. CSE101-INS001-26-1.")
+    public SectionResponse createSection(@PathVariable String courseId, @RequestBody @Valid SectionCreateRequest request) {
+        SectionDomain created = sectionService.createSection(courseId,
+                REQUEST_TO_DOMAIN_MAPPER_INSTANCE.sectionCreateRequestToDomain(request));
+        return DOMAIN_TO_RESPONSE_MAPPER_INSTANCE.sectionDomainToResponse(created);
+    }
+
+    @PutMapping("/sections/{sectionId}")
+    public SectionResponse updateSection(@PathVariable String sectionId, @RequestBody @Valid SectionUpdateRequest request) {
+        SectionDomain updated = sectionService.updateSection(sectionId,
+                REQUEST_TO_DOMAIN_MAPPER_INSTANCE.sectionUpdateRequestToDomain(request));
+        return DOMAIN_TO_RESPONSE_MAPPER_INSTANCE.sectionDomainToResponse(updated);
+    }
+
+    @DeleteMapping("/sections/{sectionId}")
+    @Operation(summary = "Deactivate a section", description = "Soft delete: enrollments and grades are kept.")
+    public Map<String, Object> deleteSection(@PathVariable String sectionId) {
+        return Map.of("sectionId", sectionId, "deleted", sectionService.deleteSection(sectionId));
+    }
+
+    // ----- Scheduling -----
+
     @GetMapping("/instructors/{code}/availability")
-    public ResponseEntity<?> instructorAvailability(@PathVariable String code,
-                                                    @RequestParam String semester,
-                                                    @RequestParam int year) {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (!isAdmin(auth)) {
-            return error(HttpStatus.FORBIDDEN, ErrorCode.ADMIN_FORBIDDEN);
-        }
-        try {
-            return ResponseEntity.ok(availabilityService.instructorAvailability(code, semester, year));
-        } catch (ErpException ex) {
-            return from(ex);
-        } catch (Exception ex) {
-            LOGGER.error("Unexpected instructor availability failure", ex);
-            return error(HttpStatus.INTERNAL_SERVER_ERROR, ErrorCode.INSTRUCTOR_FETCH_FAILED);
-        }
+    public InstructorAvailabilityResponse instructorAvailability(@PathVariable String code,
+                                         @RequestParam String semester,
+                                         @RequestParam int year) {
+        return availabilityService.instructorAvailability(code, semester, year);
     }
 
     @GetMapping("/sections/{sectionId}/schedule")
-    public ResponseEntity<?> viewSchedule(@PathVariable String sectionId) {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (!isAdmin(auth)) {
-            return error(HttpStatus.FORBIDDEN, ErrorCode.ADMIN_FORBIDDEN);
-        }
-        try {
-            SectionScheduleResult result = sectionScheduleService.view(sectionId);
-            return ResponseEntity.ok(toScheduleResponse(result));
-        } catch (ErpException ex) {
-            return from(ex);
-        } catch (Exception ex) {
-            LOGGER.error("Unexpected error fetching schedule for section {}", sectionId, ex);
-            return error(HttpStatus.INTERNAL_SERVER_ERROR, ErrorCode.SECTION_FETCH_FAILED);
-        }
+    public SectionScheduleResponse viewSchedule(@PathVariable String sectionId) {
+        return toScheduleResponse(sectionScheduleService.view(sectionId));
     }
 
     @PutMapping("/sections/{sectionId}/schedule")
-    public ResponseEntity<?> upsertSchedule(@PathVariable String sectionId,
-                                            @RequestBody @Valid SectionScheduleRequest request) {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (!isAdmin(auth)) {
-            return error(HttpStatus.FORBIDDEN, ErrorCode.ADMIN_FORBIDDEN);
-        }
-        LOGGER.info("Schedule upsert for section {}: {} slot(s) -> {}", sectionId,
-                request.slots() == null ? 0 : request.slots().size(), request);
-        try {
-            List<ClassScheduleDomain> slots = request.slots().stream()
-                    .map(REQUEST_TO_DOMAIN_MAPPER_INSTANCE::scheduleSlotRequestToDomain)
-                    .map(domain -> domain.withSectionId(sectionId))
-                    .toList();
-            SectionScheduleResult result = sectionScheduleService.replace(sectionId, slots);
-            return ResponseEntity.ok(toScheduleResponse(result));
-        } catch (ErpException ex) {
-            return from(ex);
-        } catch (Exception ex) {
-            LOGGER.error("Unexpected error saving schedule for {}", sectionId, ex);
-            return error(HttpStatus.INTERNAL_SERVER_ERROR, ErrorCode.SECTION_UPDATE_FAILED);
-        }
+    @Operation(summary = "Replace a section's weekly slots",
+            description = "409 if the room or instructor is already busy; 400 if outside working hours or the room is too small.")
+    public SectionScheduleResponse upsertSchedule(@PathVariable String sectionId,
+                                                  @RequestBody @Valid SectionScheduleRequest request) {
+        List<ClassScheduleDomain> slots = request.slots().stream()
+                .map(REQUEST_TO_DOMAIN_MAPPER_INSTANCE::scheduleSlotRequestToDomain)
+                .map(domain -> domain.withSectionId(sectionId))
+                .toList();
+        return toScheduleResponse(sectionScheduleService.replace(sectionId, slots));
     }
 
     @DeleteMapping("/sections/{sectionId}/schedule")
-    public ResponseEntity<?> deleteSchedule(@PathVariable String sectionId) {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (!isAdmin(auth)) {
-            return error(HttpStatus.FORBIDDEN, ErrorCode.ADMIN_FORBIDDEN);
-        }
-        LOGGER.info("Schedule clear requested for section {}", sectionId);
-        try {
-            sectionScheduleService.clear(sectionId);
-            return ResponseEntity.ok(Map.of("sectionId", sectionId, "deleted", true));
-        } catch (ErpException ex) {
-            return from(ex);
-        } catch (Exception ex) {
-            LOGGER.error("Unexpected error clearing schedule for {}", sectionId, ex);
-            return error(HttpStatus.INTERNAL_SERVER_ERROR, ErrorCode.SECTION_DELETE_FAILED);
-        }
+    public Map<String, Object> deleteSchedule(@PathVariable String sectionId) {
+        sectionScheduleService.clear(sectionId);
+        return Map.of("sectionId", sectionId, "deleted", true);
     }
 
     @GetMapping("/timetable")
-    public ResponseEntity<?> searchTimetable(@RequestParam(required = false) String instructorCode,
-                                             @RequestParam(required = false) String courseId,
-                                             @RequestParam(required = false) String sectionId,
-                                             @RequestParam(required = false) String roomId,
-                                             @RequestParam(required = false) String semester,
-                                             @RequestParam(required = false) Integer year,
-                                             @RequestParam(required = false) DayOfWeek day) {
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (!isAdmin(auth)) {
-            LOGGER.warn("Unauthorized timetable search by {}", auth != null ? auth.getName() : "anonymous");
-            return error(HttpStatus.FORBIDDEN, ErrorCode.ADMIN_FORBIDDEN);
-        }
-        LOGGER.info("Timetable search requested instructor={} course={} section={} room={} semester={} year={} day={}",
-                instructorCode, courseId, sectionId, roomId, semester, year, day);
-        try {
-            List<TimetableSearchSlotResponse> response = timetableService.search(
-                            instructorCode, courseId, sectionId, roomId, semester, year, day)
-                    .stream()
-                    .map(DOMAIN_TO_RESPONSE_MAPPER_INSTANCE::timetableSearchSlotDomainToResponse)
-                    .toList();
-            return ResponseEntity.ok(response);
-        } catch (ErpException ex) {
-            return from(ex);
-        } catch (Exception ex) {
-            LOGGER.error("Unexpected error searching timetable", ex);
-            return error(HttpStatus.INTERNAL_SERVER_ERROR, ErrorCode.UNEXPECTED_SERVER_ERROR);
-        }
+    @Operation(summary = "Search the master timetable; all filters optional")
+    public List<TimetableSearchSlotResponse> searchTimetable(@RequestParam(required = false) String instructorCode,
+                                                             @RequestParam(required = false) String courseId,
+                                                             @RequestParam(required = false) String sectionId,
+                                                             @RequestParam(required = false) String roomId,
+                                                             @RequestParam(required = false) String semester,
+                                                             @RequestParam(required = false) Integer year,
+                                                             @RequestParam(required = false) DayOfWeek day) {
+        return timetableService.search(instructorCode, courseId, sectionId, roomId, semester, year, day).stream()
+                .map(DOMAIN_TO_RESPONSE_MAPPER_INSTANCE::timetableSearchSlotDomainToResponse)
+                .toList();
     }
 
     private SectionScheduleResponse toScheduleResponse(SectionScheduleResult result) {
-        List<ScheduleSlotResponse> slots = result.slots().stream()
-                .map(DOMAIN_TO_RESPONSE_MAPPER_INSTANCE::classScheduleDomainToScheduleSlotResponse)
-                .toList();
         return SectionScheduleResponse.builder()
                 .sectionId(result.section().getSectionId())
                 .courseId(result.section().getCourseId())
-                .slots(slots)
+                .slots(result.slots().stream()
+                        .map(DOMAIN_TO_RESPONSE_MAPPER_INSTANCE::classScheduleDomainToScheduleSlotResponse)
+                        .toList())
                 .build();
-    }
-
-
-    private boolean isAdmin(Authentication authentication) {
-        return authentication != null && authentication.getAuthorities().stream()
-                .anyMatch(a -> a.getAuthority().equals("ADMIN"));
     }
 }

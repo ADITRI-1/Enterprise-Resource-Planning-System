@@ -8,6 +8,7 @@ import com.iiitd.erp.core.ProgramPersistPort;
 import com.iiitd.erp.core.StudentPersistPort;
 import com.iiitd.erp.core.UserAuthPersistPort;
 import com.iiitd.erp.core.service.StudentService;
+import com.iiitd.erp.core.service.support.TemporaryPasswords;
 import com.iiitd.erp.exception.ErrorCode;
 import com.iiitd.erp.exception.ErpException;
 import com.iiitd.erp.io.dto.AccountStatus;
@@ -56,12 +57,13 @@ public class StudentServiceImpl implements StudentService {
         ProgramDomain program = programPersistPort.findByProgramId(studentDomain.getProgramId());
         if (program == null) {
             throw ErpException.of(ErrorCode.PROGRAM_NOT_FOUND, Map.of("programId", studentDomain.getProgramId()));
-        };
+        }
+        parseDob(studentDomain.getDateOfBirth());
 
         try {
             UUID userId = UUID.randomUUID();
             String username = buildStudentUsername(studentDomain, program.getProgramType());
-            String rawPassword = buildStudentPassword(studentDomain);
+            String rawPassword = TemporaryPasswords.generate();
             String passwordHash = passwordEncoder.encode(rawPassword);
 
             userAuthPersistPort.save(UserAuthDomain.builder()
@@ -71,6 +73,7 @@ public class StudentServiceImpl implements StudentService {
                     .passwordHash(passwordHash)
                     .status("active")
                     .active(true)
+                    .mustChangePassword(true)
                     .build());
 
             studentPersistPort.saveStudent(studentDomain.withStudentId(userId));
@@ -81,6 +84,7 @@ public class StudentServiceImpl implements StudentService {
                     .username(username)
                     .role(Role.STUDENT)
                     .status(AccountStatus.ACTIVE)
+                    .temporaryPassword(rawPassword)
                     .build();
         } catch (ErpException ex) {
             LOGGER.error("Known failure while creating student user for roll {}: {}", rollNo, ex.getErrorCode().getCode(), ex);
@@ -188,21 +192,16 @@ public class StudentServiceImpl implements StudentService {
         return firstName + "_" + suffix + studentDomain.getRollNo();
     }
 
-    private String buildStudentPassword(StudentUserDomain studentDomain) {
-        LocalDate dob = parseDob(studentDomain.getDateOfBirth());
-        String monthDay = String.format("%02d%02d", dob.getMonthValue(), dob.getDayOfMonth());
-
-        String rollNo = studentDomain.getRollNo();
-        String lastThree = rollNo.substring(Math.max(rollNo.length() - 3, 0));
-        return monthDay + lastThree;
-    }
 
     private LocalDate parseDob(String dob) {
-        if (dob == null) throw new IllegalArgumentException("DOB is required");
-        try { return LocalDate.parse(dob, DateTimeFormatter.ISO_LOCAL_DATE); }          // yyyy-MM-dd
-        catch (Exception ignore) { }
-        try { return LocalDate.parse(dob, DateTimeFormatter.ofPattern("dd-MM-yyyy")); } // legacy
-        catch (Exception ex) { throw new IllegalArgumentException("Invalid DOB: " + dob, ex); }
+        if (dob != null) {
+            try { return LocalDate.parse(dob, DateTimeFormatter.ISO_LOCAL_DATE); }          // yyyy-MM-dd
+            catch (Exception ignore) { }
+            try { return LocalDate.parse(dob, DateTimeFormatter.ofPattern("dd-MM-yyyy")); } // legacy
+            catch (Exception ignore) { }
+        }
+        throw ErpException.of(ErrorCode.REQUEST_VALIDATION_FAILED,
+                Map.of("field", "dateOfBirth", "reason", "Use dd-MM-yyyy or yyyy-MM-dd"));
     }
 
     private <T> T keep(T incoming, T existing) { return incoming != null ? incoming : existing; }

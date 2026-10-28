@@ -31,18 +31,7 @@ class ErpFlowIntegrationTest extends PostgresIntegrationTest {
     private static final String CSE201 = "CSE201-INS001-26-1";
     private static final String MTH101 = "MTH101-INS002-26-1";
 
-    @Autowired private MockMvc mvc;
-    @Autowired private JdbcTemplate jdbc;
     @Autowired private SectionService sectionService;
-
-    private MockHttpSession login(String username, String password) throws Exception {
-        MvcResult result = mvc.perform(post("/api/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"username\":\"%s\",\"password\":\"%s\"}".formatted(username, password)))
-                .andExpect(status().isOk())
-                .andReturn();
-        return (MockHttpSession) result.getRequest().getSession(false);
-    }
 
     private String register(String sectionId) {
         return "{\"sectionId\":\"%s\"}".formatted(sectionId);
@@ -300,15 +289,26 @@ class ErpFlowIntegrationTest extends PostgresIntegrationTest {
         assertThat(jdbc.queryForObject("select start_time::text from erp_db.class_schedules where section_id = ?",
                 String.class, sectionId)).isEqualTo("09:00:00");
 
-        mvc.perform(post("/api/admin/create/student").session(admin).contentType(MediaType.APPLICATION_JSON)
+        String created = mvc.perform(post("/api/admin/create/student").session(admin).contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"name":"Kabir Singh","rollNo":2024003,"dateOfBirth":"05-11-2005",
                                  "programId":"BTECH-CSE","yearOfRegistration":"2024"}"""))
                 .andExpect(status().is2xxSuccessful())
-                .andExpect(jsonPath("$.username").value("kabir_bt2024003"));
+                .andExpect(jsonPath("$.username").value("kabir_bt2024003"))
+                .andExpect(jsonPath("$.temporaryPassword").isNotEmpty())
+                .andReturn().getResponse().getContentAsString();
+        String tempPassword = com.jayway.jsonpath.JsonPath.read(created, "$.temporaryPassword");
 
-        // New student logs in (Auth DB) and their profile loads from the ERP DB via the shared user id
-        MockHttpSession kabir = login("kabir_bt2024003", "1105003");
+        // First login with the temporary password must change it before anything else works
+        MockHttpSession kabir = login("kabir_bt2024003", tempPassword);
+        mvc.perform(get("/api/student/me").session(kabir))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.errorCode").value(ErrorCode.PASSWORD_CHANGE_REQUIRED.getCode()));
+        mvc.perform(post("/api/auth/change-password").session(kabir).contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"currentPassword\":\"%s\",\"newPassword\":\"Kabir2024!\"}".formatted(tempPassword)))
+                .andExpect(status().isOk());
+
+        // Profile loads from the ERP DB via the user id shared with the Auth DB
         String uid = com.jayway.jsonpath.JsonPath.read(
                 mvc.perform(get("/api/student/me").session(kabir)).andExpect(status().isOk())
                         .andReturn().getResponse().getContentAsString(), "$.userId");
@@ -318,7 +318,7 @@ class ErpFlowIntegrationTest extends PostgresIntegrationTest {
 
         // Only a hash is stored
         String hash = jdbc.queryForObject("select password_hash from auth_db.user_auth where username = 'kabir_bt2024003'", String.class);
-        assertThat(hash).startsWith("$2a$").doesNotContain("1105003");
+        assertThat(hash).startsWith("$2a$").doesNotContain("Kabir2024!");
     }
 
     @Test

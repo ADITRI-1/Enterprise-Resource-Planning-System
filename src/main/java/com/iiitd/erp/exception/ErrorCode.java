@@ -15,6 +15,12 @@ public enum ErrorCode {
     ADMIN_FORBIDDEN("API-001", "You need admin privileges for this action"),
     AUTH_NOT_AUTHENTICATED("API-002", "Please log in to continue"),
     AUTHENTICATION_FAILED("API-003", "Incorrect username or password"),
+    ACCOUNT_LOCKED("API-007", "Too many failed attempts. Your account is locked for 15 minutes"),
+    PASSWORD_CHANGE_REQUIRED("API-008", "You must change your temporary password before continuing"),
+    PASSWORD_POLICY_VIOLATION("API-009", "New password does not meet the password rules"),
+    PASSWORD_REUSED("API-012", "New password must differ from your recent passwords"),
+    CURRENT_PASSWORD_INCORRECT("API-013", "Current password is incorrect"),
+    USER_NOT_FOUND("API-014", "User not found"),
     INSTRUCTOR_FORBIDDEN("API-004", "You can only access your own sections"),
     STUDENT_FORBIDDEN("API-005", "You can only access your own records"),
     CATALOG_LIST_FAILED("API-010", "Unable to fetch catalog data"),
@@ -109,11 +115,6 @@ public enum ErrorCode {
     }
 
     public String getDefaultMessage() {
-        return defaultMessage;
-    }
-
-    /** Kept for existing callers; messages have no placeholders so arguments are ignored. */
-    public String format(Object... args) {
         return defaultMessage;
     }
 }

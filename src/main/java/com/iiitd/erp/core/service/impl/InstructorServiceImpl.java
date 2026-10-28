@@ -7,6 +7,7 @@ import com.iiitd.erp.core.DepartmentPersistPort;
 import com.iiitd.erp.core.InstructorPersistPort;
 import com.iiitd.erp.core.UserAuthPersistPort;
 import com.iiitd.erp.core.service.InstructorService;
+import com.iiitd.erp.core.service.support.TemporaryPasswords;
 import com.iiitd.erp.exception.ErrorCode;
 import com.iiitd.erp.exception.ErpException;
 import com.iiitd.erp.io.dto.AccountStatus;
@@ -55,7 +56,7 @@ public class InstructorServiceImpl implements InstructorService {
         try {
             UUID userId = UUID.randomUUID();
             String username = buildInstructorUsername(instructorDomain);
-            String rawPassword = buildInstructorPassword(instructorDomain);
+            String rawPassword = TemporaryPasswords.generate();
             String passwordHash = passwordEncoder.encode(rawPassword);
 
             userAuthPersistPort.save(UserAuthDomain.builder()
@@ -65,6 +66,7 @@ public class InstructorServiceImpl implements InstructorService {
                     .passwordHash(passwordHash)
                     .status("active")
                     .active(true)
+                    .mustChangePassword(true)
                     .build());
 
             instructorPersistPort.save(instructorDomain.withInstructorId(userId));
@@ -75,6 +77,7 @@ public class InstructorServiceImpl implements InstructorService {
                     .username(username)
                     .role(Role.INSTRUCTOR)
                     .status(AccountStatus.ACTIVE)
+                    .temporaryPassword(rawPassword)
                     .build();
         } catch (ErpException ex) {
             LOGGER.error("Known failure while creating instructor {}: {}", instructorCode, ex.getErrorCode().getCode(), ex);
@@ -174,13 +177,6 @@ public class InstructorServiceImpl implements InstructorService {
         return firstName + "_" + instructorDomain.getInstructorCode().toLowerCase();
     }
 
-    private String buildInstructorPassword(InstructorDomain instructorDomain) {
-        String dob = instructorDomain.getDateOfBirth();
-        String monthDay = dob.substring(3, 5) + dob.substring(0, 2);
-        String code = instructorDomain.getInstructorCode();
-        String lastThree = code.substring(Math.max(0, code.length() - 3));
-        return monthDay + lastThree;
-    }
 
     private <T> T keep(T incoming, T existing) { return incoming != null ? incoming : existing; }
 }

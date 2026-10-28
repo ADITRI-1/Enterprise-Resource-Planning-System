@@ -45,5 +45,18 @@ public class UserAuth {
     @Column(name = "password_history", columnDefinition = "jsonb")
     private String passwordHistory;
 
+    @Column(name = "must_change_password", nullable = false)
+    private boolean mustChangePassword;
+
+    @Column(name = "failed_attempts", nullable = false)
+    private int failedAttempts;
+
+    @Column(name = "locked_until")
+    private OffsetDateTime lockedUntil;
+
+    public boolean isLockedAt(OffsetDateTime now) {
+        return lockedUntil != null && lockedUntil.isAfter(now);
+    }
+
     // getters/setters
 }

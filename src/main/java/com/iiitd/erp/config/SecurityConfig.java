@@ -59,7 +59,8 @@ public class SecurityConfig {
               .sessionManagement(sm -> sm.sessionFixation().migrateSession())
             .securityContext(sc -> sc.requireExplicitSave(false))
             .authorizeHttpRequests(reg -> reg
-        .requestMatchers("/api/auth/**").permitAll()
+        .requestMatchers("/api/auth/**", "/api/system/**").permitAll()
+        .requestMatchers("/swagger-ui.html", "/swagger-ui/**", "/v3/api-docs/**").permitAll()
         .requestMatchers("/api/admin/**").hasAuthority("ADMIN")
         .requestMatchers("/api/instructor/**").hasAuthority("INSTRUCTOR")
         .requestMatchers("/api/student/**").hasAuthority("STUDENT")

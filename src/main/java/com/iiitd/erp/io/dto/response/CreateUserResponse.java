@@ -12,8 +12,9 @@ import lombok.extern.jackson.Jacksonized;
 @With
 
 public record CreateUserResponse (
-    Long id,
     String username,
     Role role,
-    AccountStatus status
+    AccountStatus status,
+    // Shown once to the admin; the user must replace it on first login.
+    String temporaryPassword
 ){}

@@ -33,6 +33,7 @@ public interface EnrollmentRepository extends JpaRepository<Enrollment, UUID> {
     Optional<Enrollment> findByStudentIdAndSectionId(UUID studentId, String sectionId);
 
     long countBySectionIdAndStatusIgnoreCase(String sectionId, String status);
+    long countByStatusIgnoreCase(String status);
 
     List<Enrollment> findByStudentIdAndStatusIgnoreCase(UUID studentId, String status);
 
