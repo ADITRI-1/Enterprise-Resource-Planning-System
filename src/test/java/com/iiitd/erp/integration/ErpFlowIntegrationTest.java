@@ -187,6 +187,53 @@ class ErpFlowIntegrationTest extends PostgresIntegrationTest {
     }
 
     @Test
+    void instructorDefinesAssessmentsEntersScoresAndComputes() throws Exception {
+        MockHttpSession inst1 = login("inst1", "Inst@123");
+        String base = "/api/instructor/INS001/sections/" + CSE201;
+
+        String quiz = com.jayway.jsonpath.JsonPath.read(mvc.perform(post(base + "/assessments").session(inst1)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"Quiz\",\"weight\":0.4,\"maxScore\":20}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.maxScore").value(20))
+                .andReturn().getResponse().getContentAsString(), "$.componentId");
+        // 40% + 70% would exceed 100%
+        mvc.perform(post(base + "/assessments").session(inst1)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"Endsem\",\"weight\":0.7,\"maxScore\":100}"))
+                .andExpect(status().isBadRequest());
+        String endsem = com.jayway.jsonpath.JsonPath.read(mvc.perform(post(base + "/assessments").session(inst1)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"Endsem\",\"weight\":0.6,\"maxScore\":100}"))
+                .andExpect(status().isCreated())
+                .andReturn().getResponse().getContentAsString(), "$.componentId");
+
+        mvc.perform(put(base + "/scores").session(inst1).contentType(MediaType.APPLICATION_JSON).content("""
+                        {"entries":[
+                          {"enrollmentId":"44444444-4444-4444-4444-000000000002","components":[
+                             {"componentId":"%1$s","score":20},{"componentId":"%2$s","score":95}]},
+                          {"enrollmentId":"44444444-4444-4444-4444-000000000003","components":[
+                             {"componentId":"%1$s","score":10},{"componentId":"%2$s","score":40}]}]}
+                        """.formatted(quiz, endsem)))
+                .andExpect(status().isOk());
+        // Above the component maximum
+        mvc.perform(put(base + "/scores").session(inst1).contentType(MediaType.APPLICATION_JSON).content("""
+                        {"entries":[{"enrollmentId":"44444444-4444-4444-4444-000000000002","components":[
+                             {"componentId":"%s","score":21}]}]}
+                        """.formatted(quiz)))
+                .andExpect(status().isBadRequest());
+
+        // stu1: 40 + 57 = 97 -> A ; stu2: 20 + 24 = 44 -> C-
+        mvc.perform(post(base + "/grades/compute").session(inst1))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[?(@.rollNo == '2024001')].finalGrade", contains("A")))
+                .andExpect(jsonPath("$[?(@.rollNo == '2024002')].finalGrade", contains("C-")));
+
+        mvc.perform(put(base + "/assessments/" + quiz).session(inst1)
+                        .contentType(MediaType.APPLICATION_JSON).content("{\"name\":\"Quiz 1\",\"weight\":0.4,\"maxScore\":25}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("Quiz 1"))
+                .andExpect(jsonPath("$.maxScore").value(25));
+    }
+
+    @Test
     void instructorCannotGradeAnotherInstructorsSection() throws Exception {
         MockHttpSession inst1 = login("inst1", "Inst@123");
 

@@ -10,9 +10,43 @@ The frontend is currently under development and will consume these APIs for user
 
 ## Project Status
 
- Backend: Ready and working
+ Backend: Spring Boot REST API, tested against real PostgreSQL
 
- Frontend: In progress (API integration pending)
+ Frontend: React + TypeScript web app in [`frontend/`](frontend/)
+
+## Quick start (no database install needed)
+
+Needs **Java 17+** and **Node 20+**.
+
+    # terminal 1: backend + embedded PostgreSQL with demo data (http://localhost:8080)
+    ./mvnw spring-boot:test-run -Dspring-boot.run.main-class=com.iiitd.erp.DevServer
+
+    # terminal 2: web app (http://localhost:5173)
+    cd frontend
+    npm install
+    npm run dev
+
+Open http://localhost:5173 and use a demo account (buttons on the login page). The dev
+database lives in `target/dev-postgres`; delete it to start over from the seed data.
+To run against your own PostgreSQL instead, see *How to Run the Backend* below.
+
+## Frontend
+
+React 18, TypeScript, Vite, Tailwind CSS, TanStack Query, React Router, Recharts.
+
+* **Students**: dashboard, course catalog with live seats and register, my registrations with
+  drop, weekly timetable, grades with transcript CSV.
+* **Instructors**: sections, inline gradebook with CSV import/export, assessment weights,
+  compute final grades, class statistics and grade distribution chart.
+* **Admins**: dashboard and maintenance switch, accounts (unlock / reset password), full
+  create/edit/delete for students, instructors, courses, sections (with a weekly schedule editor
+  that only offers free rooms), rooms, departments and programs.
+* Maintenance banner for everyone, forced password change after a temporary password,
+  dark mode, and layouts that work on phones.
+
+The dev server proxies `/api` to `localhost:8080`, so the session cookie stays same-origin.
+API types in `frontend/src/api/schema.d.ts` are generated from the backend's OpenAPI spec:
+run `npm run gen:api` while the backend is running after changing the API.
 
 ## Tech Stack
 

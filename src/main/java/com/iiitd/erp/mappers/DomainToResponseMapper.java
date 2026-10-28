@@ -33,6 +33,7 @@ public interface DomainToResponseMapper {
     @Mapping(source = "dayOfWeek", target = "day")
     ScheduleSlotResponse classScheduleDomainToScheduleSlotResponse(ClassScheduleDomain classScheduleDomain);
 
+    @Mapping(source = "scoreOutOf", target = "maxScore")
     AssessmentComponentResponse assessmentComponentDomainToResponse(AssessmentComponentDomain domain);
 
     InstructorSectionResponse sectionDomainToInstructorSectionResponse(SectionDomain sectionDomain);

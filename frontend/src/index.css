@@ -1,0 +1,58 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Colours from UI_DESIGN_SPEC.md, as RGB triplets so Tailwind can apply opacity. */
+:root {
+  --bg: 245 248 251;          /* page-bg  #F5F8FB */
+  --surface: 255 255 255;
+  --muted: 235 239 246;       /* profile-bg #EBEFF6 */
+  --border: 220 225 235;      /* #DCE1EB */
+  --fg: 40 50 65;             /* text-strong #283241 */
+  --fg-muted: 90 100 117;
+  --primary: 45 125 200;      /* #2D7DC8 */
+  --primary-fg: 255 255 255;
+  --brand: 9 53 82;           /* navy #093552 */
+  --accent: 85 172 168;       /* teal #55ACA8 */
+  --danger: 220 50 50;        /* #DC3232 */
+  --success: 22 140 90;
+  --warning: 196 120 10;
+  color-scheme: light;
+}
+
+.dark {
+  --bg: 11 18 27;
+  --surface: 18 28 40;
+  --muted: 27 40 56;
+  --border: 40 56 76;
+  --fg: 228 234 242;
+  --fg-muted: 150 163 182;
+  --primary: 86 160 230;
+  --primary-fg: 8 20 32;
+  --brand: 6 32 52;
+  --accent: 98 192 187;
+  --danger: 239 98 98;
+  --success: 64 190 132;
+  --warning: 230 170 60;
+  color-scheme: dark;
+}
+
+@layer base {
+  body {
+    @apply bg-bg text-fg antialiased;
+    font-feature-settings: "cv11", "ss01";
+  }
+  :focus-visible {
+    @apply outline-none ring-2 ring-primary/60 ring-offset-2 ring-offset-bg;
+  }
+}
+
+@layer components {
+  .input {
+    @apply h-10 w-full rounded-lg border border-border bg-surface px-3 text-sm text-fg placeholder:text-fg-muted/70
+      transition focus:border-primary focus:ring-2 focus:ring-primary/20 focus:outline-none disabled:opacity-60;
+  }
+  .card {
+    @apply rounded-xl border border-border bg-surface shadow-card;
+  }
+}

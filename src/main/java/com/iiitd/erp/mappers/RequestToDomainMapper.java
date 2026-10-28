@@ -43,5 +43,7 @@ public interface RequestToDomainMapper {
     @Mapping(source= "day", target = "dayOfWeek")
     ClassScheduleDomain scheduleSlotRequestToDomain(ScheduleSlotRequest request);
 
+    // The API calls it maxScore; the table column is score_out_of.
+    @Mapping(source = "maxScore", target = "scoreOutOf")
     AssessmentComponentDomain assessmentComponentRequestToDomain(AssessmentComponentRequest request);
 }
